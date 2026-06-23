@@ -4,6 +4,7 @@
   "main": "src/worker/index.ts",
   "compatibility_date": "2025-06-01",
   "compatibility_flags": ["nodejs_compat"],
+  "routes": [{ "pattern": "demo.rpreda.net", "custom_domain": true }],
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
@@ -21,6 +22,6 @@
     "enabled": true
   },
   "vars": {
-    "BETTER_AUTH_URL": ""
+    "BETTER_AUTH_URL": "https://demo.rpreda.net"
   }
 }
