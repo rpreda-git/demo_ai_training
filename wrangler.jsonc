@@ -13,7 +13,7 @@
     {
       "binding": "DB",
       "database_name": "kanban-db",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "241ac6be-9e59-44d5-a2e4-e7908ea248fd",
       "migrations_dir": "drizzle/migrations"
     }
   ],
