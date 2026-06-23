@@ -95,11 +95,20 @@ You said you'd wire up the repo connection yourself — here's what the project 
    - **Deploy command:** `npx wrangler deploy`
    - Run `npm run db:migrate:remote` whenever migrations change (Workers Builds can run it as a build step, or apply it manually before deploy).
 
-5. **(optional) Seed the deployment:**
+5. **(optional) Seed the deployment.** If the deployment is publicly reachable:
 
    ```bash
    SEED_BASE_URL=https://<your-worker-url> npm run db:seed:remote
    ```
+
+   If it sits behind an access gate (e.g. Cloudflare Access) the HTTP seeder
+   can't authenticate, so load the pre-built SQL seed straight into D1 instead:
+
+   ```bash
+   npx wrangler d1 execute kanban-db --remote --file=drizzle/seed-demo.sql
+   ```
+
+   Both create the demo account (`demo@kanban.dev` / `demo1234`) and sample boards.
 
 > `BETTER_AUTH_URL` is optional — without it Better Auth derives the origin from the incoming request, which is correct for this same-origin app. Set it to your deployed URL to silence the dev warning.
 
