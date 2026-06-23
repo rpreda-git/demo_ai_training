@@ -5,44 +5,59 @@ import { and, asc, count, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../lib/context";
 import { requireAuth } from "../lib/middleware";
-import { card, cardLabel, comment } from "../db/schema";
+import { boardMember, card, cardLabel, checklistItem, comment, user } from "../db/schema";
 import type { CardRow } from "../db/schema";
-import { ownedCard, ownedColumn, ownedLabel } from "../lib/resources";
-import { toCardDTO, toCommentDTO } from "../lib/serializers";
+import { accessibleCard, accessibleColumn, accessibleLabel } from "../lib/resources";
+import {
+  toAuthorDTO,
+  toCardDTO,
+  toChecklistItemDTO,
+  toCommentDTO,
+} from "../lib/serializers";
 import type { DB } from "../db";
 import type { CardDetailDTO } from "@shared/types";
 
-/** Fetches a card's labels and comment count, then serializes to a DTO. */
+const POS_STEP = 1000;
+
+/** Loads a card's labels, comment count, assignee and checklist progress. */
 async function cardDTO(db: DB, row: CardRow) {
-  const links = await db.query.cardLabel.findMany({
-    where: eq(cardLabel.cardId, row.id),
-    with: { label: true },
+  const [links, [{ n }], checklist, assignee] = await Promise.all([
+    db.query.cardLabel.findMany({ where: eq(cardLabel.cardId, row.id), with: { label: true } }),
+    db.select({ n: count() }).from(comment).where(eq(comment.cardId, row.id)),
+    db.query.checklistItem.findMany({ where: eq(checklistItem.cardId, row.id) }),
+    row.assigneeId
+      ? db.query.user.findFirst({ where: eq(user.id, row.assigneeId) })
+      : Promise.resolve(null),
+  ]);
+  return toCardDTO(row, {
+    labels: links.map((l) => l.label),
+    commentCount: n,
+    assignee: toAuthorDTO(assignee),
+    checklistTotal: checklist.length,
+    checklistDone: checklist.filter((i) => i.completed).length,
   });
-  const [{ n }] = await db
-    .select({ n: count() })
-    .from(comment)
-    .where(eq(comment.cardId, row.id));
-  return toCardDTO(
-    row,
-    links.map((l) => l.label),
-    n,
-  );
 }
 
 export const cardsRouter = new Hono<AppEnv>()
   .use(requireAuth)
 
-  // Card with its full comment thread.
+  // Card with its comments and checklist.
   .get("/:cardId", async (c) => {
     const db = c.get("db");
-    const row = await ownedCard(db, c.req.param("cardId"), c.get("user").id);
+    const row = await accessibleCard(db, c.req.param("cardId"), c.get("user").id);
     const base = await cardDTO(db, row);
 
-    const comments = await db.query.comment.findMany({
-      where: eq(comment.cardId, row.id),
-      orderBy: [asc(comment.createdAt)],
-      with: { user: true },
-    });
+    const [comments, checklist] = await Promise.all([
+      db.query.comment.findMany({
+        where: eq(comment.cardId, row.id),
+        orderBy: [asc(comment.createdAt)],
+        with: { user: true },
+      }),
+      db.query.checklistItem.findMany({
+        where: eq(checklistItem.cardId, row.id),
+        orderBy: [asc(checklistItem.position)],
+      }),
+    ]);
 
     const detail: CardDetailDTO = {
       ...base,
@@ -55,11 +70,12 @@ export const cardsRouter = new Hono<AppEnv>()
           author: { id: cm.user.id, name: cm.user.name, image: cm.user.image },
         }),
       ),
+      checklist: checklist.map(toChecklistItemDTO),
     };
     return c.json(detail);
   })
 
-  // Edit and/or move a card.
+  // Edit, move, assign.
   .patch(
     "/:cardId",
     zValidator(
@@ -71,22 +87,38 @@ export const cardsRouter = new Hono<AppEnv>()
         completed: z.boolean().optional(),
         columnId: z.string().optional(),
         position: z.number().optional(),
+        assigneeId: z.string().nullable().optional(),
       }),
     ),
     async (c) => {
       const db = c.get("db");
       const userId = c.get("user").id;
-      const existing = await ownedCard(db, c.req.param("cardId"), userId);
+      const existing = await accessibleCard(db, c.req.param("cardId"), userId);
       const input = c.req.valid("json");
 
-      // Moving to another column: the target must be on the same board.
       let columnId = existing.columnId;
       if (input.columnId && input.columnId !== existing.columnId) {
-        const target = await ownedColumn(db, input.columnId, userId);
+        const target = await accessibleColumn(db, input.columnId, userId);
         if (target.boardId !== existing.boardId) {
           throw new HTTPException(400, { message: "Cannot move card across boards" });
         }
         columnId = target.id;
+      }
+
+      let assigneeId = existing.assigneeId;
+      if (input.assigneeId !== undefined) {
+        if (input.assigneeId === null) {
+          assigneeId = null;
+        } else {
+          const member = await db.query.boardMember.findFirst({
+            where: and(
+              eq(boardMember.boardId, existing.boardId),
+              eq(boardMember.userId, input.assigneeId),
+            ),
+          });
+          if (!member) throw new HTTPException(400, { message: "Assignee must be a board member" });
+          assigneeId = input.assigneeId;
+        }
       }
 
       const [updated] = await db
@@ -99,6 +131,7 @@ export const cardsRouter = new Hono<AppEnv>()
           completed: input.completed ?? existing.completed,
           columnId,
           position: input.position ?? existing.position,
+          assigneeId,
         })
         .where(eq(card.id, existing.id))
         .returning();
@@ -109,20 +142,20 @@ export const cardsRouter = new Hono<AppEnv>()
 
   .delete("/:cardId", async (c) => {
     const db = c.get("db");
-    const existing = await ownedCard(db, c.req.param("cardId"), c.get("user").id);
+    const existing = await accessibleCard(db, c.req.param("cardId"), c.get("user").id);
     await db.delete(card).where(eq(card.id, existing.id));
     return c.body(null, 204);
   })
 
-  // Attach a label.
+  // Attach / detach labels.
   .post(
     "/:cardId/labels",
     zValidator("json", z.object({ labelId: z.string() })),
     async (c) => {
       const db = c.get("db");
       const userId = c.get("user").id;
-      const cardRow = await ownedCard(db, c.req.param("cardId"), userId);
-      const labelRow = await ownedLabel(db, c.req.valid("json").labelId, userId);
+      const cardRow = await accessibleCard(db, c.req.param("cardId"), userId);
+      const labelRow = await accessibleLabel(db, c.req.valid("json").labelId, userId);
       if (labelRow.boardId !== cardRow.boardId) {
         throw new HTTPException(400, { message: "Label belongs to another board" });
       }
@@ -134,10 +167,9 @@ export const cardsRouter = new Hono<AppEnv>()
     },
   )
 
-  // Detach a label.
   .delete("/:cardId/labels/:labelId", async (c) => {
     const db = c.get("db");
-    const cardRow = await ownedCard(db, c.req.param("cardId"), c.get("user").id);
+    const cardRow = await accessibleCard(db, c.req.param("cardId"), c.get("user").id);
     await db
       .delete(cardLabel)
       .where(
@@ -146,17 +178,17 @@ export const cardsRouter = new Hono<AppEnv>()
     return c.json(await cardDTO(db, cardRow));
   })
 
-  // Add a comment.
+  // Comments.
   .post(
     "/:cardId/comments",
     zValidator("json", z.object({ body: z.string().trim().min(1).max(2000) })),
     async (c) => {
       const db = c.get("db");
-      const user = c.get("user");
-      const cardRow = await ownedCard(db, c.req.param("cardId"), user.id);
+      const user_ = c.get("user");
+      const cardRow = await accessibleCard(db, c.req.param("cardId"), user_.id);
       const [created] = await db
         .insert(comment)
-        .values({ cardId: cardRow.id, userId: user.id, body: c.req.valid("json").body })
+        .values({ cardId: cardRow.id, userId: user_.id, body: c.req.valid("json").body })
         .returning();
       return c.json(
         toCommentDTO({
@@ -164,9 +196,29 @@ export const cardsRouter = new Hono<AppEnv>()
           cardId: created.cardId,
           body: created.body,
           createdAt: created.createdAt,
-          author: { id: user.id, name: user.name, image: user.image ?? null },
+          author: { id: user_.id, name: user_.name, image: user_.image ?? null },
         }),
         201,
       );
+    },
+  )
+
+  // Checklist: add an item.
+  .post(
+    "/:cardId/checklist",
+    zValidator("json", z.object({ text: z.string().trim().min(1).max(300) })),
+    async (c) => {
+      const db = c.get("db");
+      const cardRow = await accessibleCard(db, c.req.param("cardId"), c.get("user").id);
+      const last = await db.query.checklistItem.findFirst({
+        where: eq(checklistItem.cardId, cardRow.id),
+        orderBy: (i, { desc }) => [desc(i.position)],
+      });
+      const position = (last?.position ?? 0) + POS_STEP;
+      const [created] = await db
+        .insert(checklistItem)
+        .values({ cardId: cardRow.id, text: c.req.valid("json").text, position })
+        .returning();
+      return c.json(toChecklistItemDTO(created), 201);
     },
   );

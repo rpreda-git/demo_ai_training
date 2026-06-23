@@ -1,10 +1,11 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { format, isPast, isToday } from "date-fns";
-import { CalendarClock, CheckCircle2, MessageSquare } from "lucide-react";
+import { CalendarClock, CheckCircle2, CheckSquare, MessageSquare } from "lucide-react";
 import type { CardDTO } from "@shared/types";
 import { cn } from "@/lib/utils";
 import { LabelPill } from "@/components/board/label-pill";
+import { MemberAvatar } from "@/components/board/member-avatar";
 
 export function KanbanCardView({
   card,
@@ -57,7 +58,7 @@ export function KanbanCardView({
         </span>
       </div>
 
-      {(due || card.commentCount > 0) && (
+      {(due || card.commentCount > 0 || card.checklistTotal > 0 || card.assignee) && (
         <div className="text-muted-foreground flex items-center gap-3 text-xs">
           {due && (
             <span
@@ -70,12 +71,24 @@ export function KanbanCardView({
               {format(due, "MMM d")}
             </span>
           )}
+          {card.checklistTotal > 0 && (
+            <span
+              className={cn(
+                "flex items-center gap-1",
+                card.checklistDone === card.checklistTotal && "text-green-500",
+              )}
+            >
+              <CheckSquare className="size-3.5" />
+              {card.checklistDone}/{card.checklistTotal}
+            </span>
+          )}
           {card.commentCount > 0 && (
             <span className="flex items-center gap-1">
               <MessageSquare className="size-3.5" />
               {card.commentCount}
             </span>
           )}
+          {card.assignee && <MemberAvatar user={card.assignee} className="ml-auto size-6" />}
         </div>
       )}
     </div>

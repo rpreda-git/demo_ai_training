@@ -17,7 +17,10 @@ A mildly complex Trello-style Kanban app built to demo a modern full-stack TypeS
 ## Features
 
 - Email/password auth with sessions (Better Auth) and guarded routes
-- Boards → columns → cards, with labels, due dates, completion, and comments
+- User settings: update name/avatar and change password
+- Boards → columns → cards, with labels, due dates, completion, comments and **checklists** (with progress)
+- **Board sharing**: invite existing users as members (role-based: owner vs editor), assign cards to members
+- **Filtering** by text, label, due window, and assignee — persisted in the URL via TanStack Router search params
 - Drag-and-drop cards within and across columns, persisted with fractional positions
 - Optimistic UI for every mutation (TanStack Query cache updates + rollback on error)
 - Polished, responsive shadcn UI with light/dark theme toggle
@@ -56,11 +59,11 @@ npm run db:seed:local
 ### Demo credentials (after seeding)
 
 ```
-email:    demo@kanban.dev
-password: demo1234
+demo@kanban.dev  / demo1234    (owns the boards)
+grace@kanban.dev / grace1234   (shares the "Product Roadmap" board)
 ```
 
-Or just sign up with any email/password on the login screen.
+Sign in as both (in different browsers) to see sharing and assignees in action. Or just sign up with any email/password on the login screen.
 
 ## Deploy to Cloudflare
 
@@ -83,6 +86,12 @@ You said you'd wire up the repo connection yourself — here's what the project 
    ```bash
    npm run db:migrate:remote
    ```
+
+   > Already deployed an earlier version? Just run this — the collaboration
+   > migration adds the new tables and backfills an "owner" membership for every
+   > existing board, so current data keeps working. Apply it **before/around**
+   > deploying the new code (the new Worker queries the new tables). Don't re-run
+   > `seed-demo.sql` on a database that already has data.
 
 4. **Deploy.** Either manually:
 

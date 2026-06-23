@@ -1,7 +1,17 @@
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { CalendarClock, Check, Loader2, Send, Tag, Trash2 } from "lucide-react";
-import type { CardDetailDTO, LabelDTO } from "@shared/types";
+import {
+  CalendarClock,
+  Check,
+  Loader2,
+  Plus,
+  Send,
+  Tag,
+  Trash2,
+  User as UserIcon,
+  X,
+} from "lucide-react";
+import type { CardDetailDTO, LabelDTO, MemberDTO } from "@shared/types";
 import { useSession } from "@/lib/auth-client";
 import { useBoardActions } from "@/hooks/use-board";
 import { useCard, useCardActions } from "@/hooks/use-card";
@@ -11,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -19,8 +30,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { LabelPill } from "@/components/board/label-pill";
+import { MemberAvatar } from "@/components/board/member-avatar";
 
 function initials(name: string) {
   return name
@@ -39,12 +57,14 @@ export function CardDialog({
   boardId,
   cardId,
   labels,
+  members,
   open,
   onOpenChange,
 }: {
   boardId: string;
   cardId: string | null;
   labels: LabelDTO[];
+  members: MemberDTO[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -57,6 +77,7 @@ export function CardDialog({
             boardId={boardId}
             cardId={cardId}
             boardLabels={labels}
+            members={members}
             onClose={() => onOpenChange(false)}
           />
         ) : null}
@@ -69,11 +90,13 @@ function CardDialogContent({
   boardId,
   cardId,
   boardLabels,
+  members,
   onClose,
 }: {
   boardId: string;
   cardId: string;
   boardLabels: LabelDTO[];
+  members: MemberDTO[];
   onClose: () => void;
 }) {
   const { data: card, isLoading } = useCard(cardId);
@@ -93,6 +116,7 @@ function CardDialogContent({
       boardId={boardId}
       card={card}
       boardLabels={boardLabels}
+      members={members}
       onClose={onClose}
     />
   );
@@ -102,22 +126,44 @@ function CardBody({
   boardId,
   card,
   boardLabels,
+  members,
   onClose,
 }: {
   boardId: string;
   card: CardDetailDTO;
   boardLabels: LabelDTO[];
+  members: MemberDTO[];
   onClose: () => void;
 }) {
   const { data: session } = useSession();
   const { updateCard, deleteCard } = useBoardActions(boardId);
-  const { addComment, deleteComment, toggleLabel } = useCardActions(boardId, card.id);
+  const {
+    addComment,
+    deleteComment,
+    toggleLabel,
+    setAssignee,
+    addChecklistItem,
+    toggleChecklistItem,
+    deleteChecklistItem,
+  } = useCardActions(boardId, card.id);
 
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description ?? "");
   const [completed, setCompleted] = useState(card.completed);
   const [comment, setComment] = useState("");
+  const [newItem, setNewItem] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const checklistDone = card.checklist.filter((i) => i.completed).length;
+  const checklistPct = card.checklist.length
+    ? Math.round((checklistDone / card.checklist.length) * 100)
+    : 0;
+
+  function submitChecklistItem() {
+    const text = newItem.trim();
+    if (!text) return;
+    addChecklistItem.mutate(text, { onSuccess: () => setNewItem("") });
+  }
 
   const attachedIds = new Set(card.labels.map((l) => l.id));
 
@@ -194,6 +240,77 @@ function CardBody({
             />
           </section>
 
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+                Checklist
+              </h4>
+              {card.checklist.length > 0 && (
+                <span className="text-muted-foreground text-xs">
+                  {checklistDone}/{card.checklist.length}
+                </span>
+              )}
+            </div>
+            {card.checklist.length > 0 && (
+              <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
+                <div
+                  className="h-full bg-green-500 transition-all"
+                  style={{ width: `${checklistPct}%` }}
+                />
+              </div>
+            )}
+            <ul className="space-y-1">
+              {card.checklist.map((item) => (
+                <li key={item.id} className="group/item flex items-center gap-2">
+                  <Checkbox
+                    checked={item.completed}
+                    onCheckedChange={(v) =>
+                      toggleChecklistItem.mutate({ itemId: item.id, completed: v === true })
+                    }
+                  />
+                  <span
+                    className={cn(
+                      "flex-1 text-sm",
+                      item.completed && "text-muted-foreground line-through",
+                    )}
+                  >
+                    {item.text}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => deleteChecklistItem.mutate(item.id)}
+                    className="text-muted-foreground hover:text-destructive opacity-0 group-hover/item:opacity-100"
+                    aria-label="Delete item"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-2">
+              <Input
+                value={newItem}
+                onChange={(e) => setNewItem(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    submitChecklistItem();
+                  }
+                }}
+                placeholder="Add an item…"
+                className="h-8"
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={submitChecklistItem}
+                disabled={!newItem.trim()}
+              >
+                <Plus className="size-4" />
+              </Button>
+            </div>
+          </section>
+
           <section className="space-y-3">
             <h4 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
               Comments
@@ -258,6 +375,37 @@ function CardBody({
         </div>
 
         <aside className="space-y-5">
+          <div className="space-y-2">
+            <h4 className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+              <UserIcon className="size-3.5" /> Assignee
+            </h4>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+                  {card.assignee ? (
+                    <>
+                      <MemberAvatar user={card.assignee} className="size-5" />
+                      <span className="truncate">{card.assignee.name}</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">Unassigned</span>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuItem onSelect={() => setAssignee.mutate(null)}>
+                  Unassigned
+                </DropdownMenuItem>
+                {members.map((m) => (
+                  <DropdownMenuItem key={m.userId} onSelect={() => setAssignee.mutate(m.userId)}>
+                    <MemberAvatar user={m} className="size-5" />
+                    <span className="truncate">{m.name}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
           <div className="space-y-2">
             <h4 className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
               <Tag className="size-3.5" /> Labels

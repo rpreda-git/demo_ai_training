@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { MoreHorizontal, Plus, Trash2, X } from "lucide-react";
-import type { ColumnDTO } from "@shared/types";
+import type { CardDTO, ColumnDTO } from "@shared/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,10 +14,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { KanbanCard } from "@/components/board/kanban-card";
+import { KanbanCard, KanbanCardView } from "@/components/board/kanban-card";
 
 export function KanbanColumn({
   column,
+  cards,
+  interactive,
   onOpenCard,
   onToggleComplete,
   onAddCard,
@@ -25,6 +27,8 @@ export function KanbanColumn({
   onDelete,
 }: {
   column: ColumnDTO;
+  cards: CardDTO[];
+  interactive: boolean;
   onOpenCard: (cardId: string) => void;
   onToggleComplete: (cardId: string, next: boolean) => void;
   onAddCard: (title: string) => void;
@@ -56,7 +60,7 @@ export function KanbanColumn({
     setCardDraft("");
   }
 
-  const cardIds = column.cards.map((c) => c.id);
+  const cardIds = cards.map((c) => c.id);
 
   return (
     <div className="bg-muted/50 flex max-h-full w-72 shrink-0 flex-col rounded-xl border">
@@ -86,7 +90,7 @@ export function KanbanColumn({
           </button>
         )}
         <span className="bg-background text-muted-foreground rounded-full px-2 py-0.5 text-xs">
-          {column.cards.length}
+          {cards.length}
         </span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -110,20 +114,31 @@ export function KanbanColumn({
           isOver && "bg-accent/40 rounded-lg",
         )}
       >
-        <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
-          {column.cards.map((card) => (
-            <KanbanCard
-              key={card.id}
-              card={card}
-              onOpen={onOpenCard}
-              onToggleComplete={(next) => onToggleComplete(card.id, next)}
-            />
-          ))}
-        </SortableContext>
+        {interactive ? (
+          <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
+            {cards.map((card) => (
+              <KanbanCard
+                key={card.id}
+                card={card}
+                onOpen={onOpenCard}
+                onToggleComplete={(next) => onToggleComplete(card.id, next)}
+              />
+            ))}
+          </SortableContext>
+        ) : (
+          cards.map((card) => (
+            <div key={card.id} onClick={() => onOpenCard(card.id)} className="cursor-pointer">
+              <KanbanCardView
+                card={card}
+                onToggleComplete={(next) => onToggleComplete(card.id, next)}
+              />
+            </div>
+          ))
+        )}
       </div>
 
       <div className="p-2">
-        {adding ? (
+        {!interactive ? null : adding ? (
           <div className="flex flex-col gap-2">
             <Textarea
               autoFocus

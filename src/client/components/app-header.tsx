@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { KanbanSquare, LogOut } from "lucide-react";
+import { KanbanSquare, LogOut, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { signOut, useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -65,6 +65,12 @@ export function AppHeader() {
                 {user?.email}
               </span>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/settings">
+                <Settings className="size-4" /> Settings
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onSelect={handleSignOut}>
               <LogOut className="size-4" />

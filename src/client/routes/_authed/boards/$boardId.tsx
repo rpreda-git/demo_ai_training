@@ -3,20 +3,37 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { boardQueryOptions, useBoard } from "@/hooks/use-board";
 import { useUpdateBoard } from "@/hooks/use-boards";
+import type { BoardFilters, DueFilter } from "@/lib/card-filters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { KanbanBoard } from "@/components/board/kanban-board";
 import { BoardLabelsMenu } from "@/components/board/board-labels-menu";
+import { BoardMembersDialog } from "@/components/board/board-members-dialog";
+import { BoardFilterBar } from "@/components/board/board-filter-bar";
+
+const DUE_VALUES: DueFilter[] = ["overdue", "today", "week"];
 
 export const Route = createFileRoute("/_authed/boards/$boardId")({
   loader: ({ context, params }) =>
     context.queryClient.ensureQueryData(boardQueryOptions(params.boardId)),
+  validateSearch: (search: Record<string, unknown>): BoardFilters => {
+    const due = search.due as DueFilter;
+    return {
+      q: typeof search.q === "string" && search.q ? search.q : undefined,
+      label: typeof search.label === "string" && search.label ? search.label : undefined,
+      due: DUE_VALUES.includes(due) ? due : undefined,
+      assignee:
+        typeof search.assignee === "string" && search.assignee ? search.assignee : undefined,
+    };
+  },
   component: BoardPage,
 });
 
 function BoardPage() {
   const { boardId } = Route.useParams();
+  const filters = Route.useSearch();
+  const navigate = Route.useNavigate();
   const { data: board, isError } = useBoard(boardId);
   const updateBoard = useUpdateBoard();
   const [editingTitle, setEditingTitle] = useState(false);
@@ -91,9 +108,20 @@ function BoardPage() {
         )}
         <div className="flex-1" />
         <BoardLabelsMenu boardId={board.id} labels={board.labels} />
+        <BoardMembersDialog boardId={board.id} members={board.members} role={board.role} />
       </div>
 
-      <KanbanBoard board={board} />
+      <div className="px-4 pb-4 sm:px-6">
+        <BoardFilterBar
+          filters={filters}
+          labels={board.labels}
+          members={board.members}
+          onChange={(patch) => navigate({ search: (prev) => ({ ...prev, ...patch }) })}
+          onClear={() => navigate({ search: {} })}
+        />
+      </div>
+
+      <KanbanBoard board={board} filters={filters} />
     </div>
   );
 }

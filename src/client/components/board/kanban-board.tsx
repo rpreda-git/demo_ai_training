@@ -13,19 +13,24 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, X } from "lucide-react";
 import type { BoardDetailDTO, CardDTO } from "@shared/types";
+import { useSession } from "@/lib/auth-client";
 import { useBoardActions } from "@/hooks/use-board";
 import { queryKeys } from "@/lib/query-keys";
 import { findCard, moveCard, positionForIndex } from "@/lib/board-cache";
+import { hasActiveFilters, matchesFilters, type BoardFilters } from "@/lib/card-filters";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { KanbanColumn } from "@/components/board/kanban-column";
 import { KanbanCardView } from "@/components/board/kanban-card";
 import { CardDialog } from "@/components/board/card-dialog";
 
-export function KanbanBoard({ board }: { board: BoardDetailDTO }) {
+export function KanbanBoard({ board, filters }: { board: BoardDetailDTO; filters: BoardFilters }) {
   const qc = useQueryClient();
   const boardKey = queryKeys.board(board.id);
   const actions = useBoardActions(board.id);
+  const { data: session } = useSession();
+  const interactive = !hasActiveFilters(filters);
 
   const [activeCard, setActiveCard] = useState<CardDTO | null>(null);
   const [openCardId, setOpenCardId] = useState<string | null>(null);
@@ -121,6 +126,12 @@ export function KanbanBoard({ board }: { board: BoardDetailDTO }) {
             <KanbanColumn
               key={column.id}
               column={column}
+              cards={
+                interactive
+                  ? column.cards
+                  : column.cards.filter((c) => matchesFilters(c, filters, session?.user?.id))
+              }
+              interactive={interactive}
               onOpenCard={setOpenCardId}
               onToggleComplete={(cardId, next) =>
                 actions.updateCard.mutate({ cardId, data: { completed: next } })
@@ -131,7 +142,7 @@ export function KanbanBoard({ board }: { board: BoardDetailDTO }) {
             />
           ))}
 
-          <div className="w-72 shrink-0">
+          <div className={cn("w-72 shrink-0", !interactive && "hidden")}>
             {addingColumn ? (
               <div className="bg-muted/50 flex flex-col gap-2 rounded-xl border p-2">
                 <Input
@@ -183,6 +194,7 @@ export function KanbanBoard({ board }: { board: BoardDetailDTO }) {
         boardId={board.id}
         cardId={openCardId}
         labels={board.labels}
+        members={board.members}
         open={!!openCardId}
         onOpenChange={(open) => !open && setOpenCardId(null)}
       />

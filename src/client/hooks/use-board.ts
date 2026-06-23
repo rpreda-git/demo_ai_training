@@ -103,6 +103,21 @@ export function useBoardActions(boardId: string) {
     onError: (e) => toast.error(message(e)),
   });
 
+  const addMember = useMutation({
+    mutationFn: (email: string) => api.addMember(boardId, email),
+    onSuccess: (member) => {
+      write((b) => cache.addMember(b, member));
+      toast.success(`Added ${member.name}`);
+    },
+    onError: (e) => toast.error(message(e)),
+  });
+
+  const removeMember = useMutation({
+    mutationFn: (userId: string) => api.removeMember(boardId, userId),
+    onSuccess: (_res, userId) => write((b) => cache.removeMember(b, userId)),
+    onError: (e) => toast.error(message(e)),
+  });
+
   return {
     createColumn,
     renameColumn,
@@ -111,6 +126,8 @@ export function useBoardActions(boardId: string) {
     updateCard,
     deleteCard,
     createLabel,
+    addMember,
+    removeMember,
     /** Directly write to the board cache (used for live drag-and-drop). */
     write,
   };

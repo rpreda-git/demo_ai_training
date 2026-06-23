@@ -9,6 +9,7 @@ import { columnsRouter } from "./routes/columns";
 import { cardsRouter } from "./routes/cards";
 import { labelsRouter } from "./routes/labels";
 import { commentsRouter } from "./routes/comments";
+import { checklistRouter } from "./routes/checklist";
 
 const app = new Hono<AppEnv>();
 
@@ -30,7 +31,8 @@ const routes = app
   .route("/api/columns", columnsRouter)
   .route("/api/cards", cardsRouter)
   .route("/api/labels", labelsRouter)
-  .route("/api/comments", commentsRouter);
+  .route("/api/comments", commentsRouter)
+  .route("/api/checklist", checklistRouter);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 

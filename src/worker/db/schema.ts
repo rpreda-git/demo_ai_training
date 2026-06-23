@@ -118,10 +118,26 @@ export const card = sqliteTable(
     position: real("position").notNull(),
     dueDate: integer("due_date", { mode: "timestamp" }),
     completed: integer("completed", { mode: "boolean" }).notNull().default(false),
+    assigneeId: text("assignee_id").references(() => user.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [index("card_column_idx").on(t.columnId), index("card_board_idx").on(t.boardId)],
+);
+
+export const checklistItem = sqliteTable(
+  "checklist_item",
+  {
+    id: id(),
+    cardId: text("card_id")
+      .notNull()
+      .references(() => card.id, { onDelete: "cascade" }),
+    text: text("text").notNull(),
+    completed: integer("completed", { mode: "boolean" }).notNull().default(false),
+    position: real("position").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("checklist_card_idx").on(t.cardId)],
 );
 
 export const label = sqliteTable(
@@ -166,6 +182,24 @@ export const comment = sqliteTable(
   (t) => [index("comment_card_idx").on(t.cardId)],
 );
 
+export const boardMember = sqliteTable(
+  "board_member",
+  {
+    boardId: text("board_id")
+      .notNull()
+      .references(() => board.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // "owner" can manage members and delete the board; "editor" edits content.
+    role: text("role", { enum: ["owner", "editor"] })
+      .notNull()
+      .default("editor"),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.boardId, t.userId] }), index("board_member_user_idx").on(t.userId)],
+);
+
 /* -------------------------------------------------------------------------- */
 /*  Relations (used by Drizzle's relational query API)                        */
 /* -------------------------------------------------------------------------- */
@@ -175,6 +209,12 @@ export const boardRelations = relations(board, ({ many, one }) => ({
   columns: many(column),
   labels: many(label),
   cards: many(card),
+  members: many(boardMember),
+}));
+
+export const boardMemberRelations = relations(boardMember, ({ one }) => ({
+  board: one(board, { fields: [boardMember.boardId], references: [board.id] }),
+  user: one(user, { fields: [boardMember.userId], references: [user.id] }),
 }));
 
 export const columnRelations = relations(column, ({ one, many }) => ({
@@ -185,8 +225,14 @@ export const columnRelations = relations(column, ({ one, many }) => ({
 export const cardRelations = relations(card, ({ one, many }) => ({
   column: one(column, { fields: [card.columnId], references: [column.id] }),
   board: one(board, { fields: [card.boardId], references: [board.id] }),
+  assignee: one(user, { fields: [card.assigneeId], references: [user.id] }),
   cardLabels: many(cardLabel),
   comments: many(comment),
+  checklist: many(checklistItem),
+}));
+
+export const checklistItemRelations = relations(checklistItem, ({ one }) => ({
+  card: one(card, { fields: [checklistItem.cardId], references: [card.id] }),
 }));
 
 export const labelRelations = relations(label, ({ one, many }) => ({
@@ -210,3 +256,6 @@ export type CardRow = typeof card.$inferSelect;
 export type LabelRow = typeof label.$inferSelect;
 export type CommentRow = typeof comment.$inferSelect;
 export type UserRow = typeof user.$inferSelect;
+export type BoardMemberRow = typeof boardMember.$inferSelect;
+export type ChecklistItemRow = typeof checklistItem.$inferSelect;
+export type BoardRole = BoardMemberRow["role"];

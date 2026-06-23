@@ -3,9 +3,11 @@ import type {
   BoardSummaryDTO,
   CardDetailDTO,
   CardDTO,
+  ChecklistItemDTO,
   ColumnDTO,
   CommentDTO,
   LabelDTO,
+  MemberDTO,
 } from "@shared/types";
 
 export class ApiError extends Error {
@@ -84,6 +86,7 @@ export const api = {
       completed?: boolean;
       columnId?: string;
       position?: number;
+      assigneeId?: string | null;
     },
   ) => http<CardDTO>(`/cards/${cardId}`, patch(data)),
   deleteCard: (cardId: string) => http<void>(`/cards/${cardId}`, del),
@@ -101,4 +104,20 @@ export const api = {
   updateLabel: (labelId: string, data: { name?: string; color?: string }) =>
     http<LabelDTO>(`/labels/${labelId}`, patch(data)),
   deleteLabel: (labelId: string) => http<void>(`/labels/${labelId}`, del),
+
+  // Members
+  listMembers: (boardId: string) => http<MemberDTO[]>(`/boards/${boardId}/members`),
+  addMember: (boardId: string, email: string) =>
+    http<MemberDTO>(`/boards/${boardId}/members`, body({ email })),
+  removeMember: (boardId: string, userId: string) =>
+    http<void>(`/boards/${boardId}/members/${userId}`, del),
+
+  // Checklist
+  addChecklistItem: (cardId: string, text: string) =>
+    http<ChecklistItemDTO>(`/cards/${cardId}/checklist`, body({ text })),
+  updateChecklistItem: (
+    itemId: string,
+    data: { text?: string; completed?: boolean; position?: number },
+  ) => http<ChecklistItemDTO>(`/checklist/${itemId}`, patch(data)),
+  deleteChecklistItem: (itemId: string) => http<void>(`/checklist/${itemId}`, del),
 };

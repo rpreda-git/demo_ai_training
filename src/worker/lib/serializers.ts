@@ -1,11 +1,21 @@
 import type {
+  AuthorDTO,
   BoardSummaryDTO,
   CardDTO,
+  ChecklistItemDTO,
   ColumnDTO,
   CommentDTO,
   LabelDTO,
+  MemberDTO,
 } from "@shared/types";
-import type { BoardRow, CardRow, ColumnRow, LabelRow } from "../db/schema";
+import type {
+  BoardRole,
+  BoardRow,
+  CardRow,
+  ChecklistItemRow,
+  ColumnRow,
+  LabelRow,
+} from "../db/schema";
 
 const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
 
@@ -13,11 +23,39 @@ export function toLabelDTO(row: LabelRow): LabelDTO {
   return { id: row.id, boardId: row.boardId, name: row.name, color: row.color };
 }
 
-export function toCardDTO(
-  row: CardRow,
-  labels: LabelRow[],
-  commentCount: number,
-): CardDTO {
+export function toAuthorDTO(
+  user: { id: string; name: string; image: string | null } | null | undefined,
+): AuthorDTO | null {
+  return user ? { id: user.id, name: user.name, image: user.image } : null;
+}
+
+export function toChecklistItemDTO(row: ChecklistItemRow): ChecklistItemDTO {
+  return {
+    id: row.id,
+    cardId: row.cardId,
+    text: row.text,
+    completed: row.completed,
+    position: row.position,
+  };
+}
+
+export interface CardExtras {
+  labels: LabelRow[];
+  commentCount: number;
+  assignee: AuthorDTO | null;
+  checklistTotal: number;
+  checklistDone: number;
+}
+
+export const EMPTY_CARD_EXTRAS: CardExtras = {
+  labels: [],
+  commentCount: 0,
+  assignee: null,
+  checklistTotal: 0,
+  checklistDone: 0,
+};
+
+export function toCardDTO(row: CardRow, extra: CardExtras): CardDTO {
   return {
     id: row.id,
     columnId: row.columnId,
@@ -29,8 +67,11 @@ export function toCardDTO(
     completed: row.completed,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    labels: labels.map(toLabelDTO),
-    commentCount,
+    labels: extra.labels.map(toLabelDTO),
+    commentCount: extra.commentCount,
+    assignee: extra.assignee,
+    checklistTotal: extra.checklistTotal,
+    checklistDone: extra.checklistDone,
   };
 }
 
@@ -46,8 +87,7 @@ export function toColumnDTO(row: ColumnRow, cards: CardDTO[]): ColumnDTO {
 
 export function toBoardSummaryDTO(
   row: BoardRow,
-  columnCount: number,
-  cardCount: number,
+  meta: { columnCount: number; cardCount: number; role: BoardRole; memberCount: number },
 ): BoardSummaryDTO {
   return {
     id: row.id,
@@ -56,8 +96,23 @@ export function toBoardSummaryDTO(
     color: row.color,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    columnCount,
-    cardCount,
+    columnCount: meta.columnCount,
+    cardCount: meta.cardCount,
+    role: meta.role,
+    memberCount: meta.memberCount,
+  };
+}
+
+export function toMemberDTO(row: {
+  role: BoardRole;
+  user: { id: string; name: string; email: string; image: string | null };
+}): MemberDTO {
+  return {
+    userId: row.user.id,
+    name: row.user.name,
+    email: row.user.email,
+    image: row.user.image,
+    role: row.role,
   };
 }
 
@@ -66,7 +121,7 @@ export function toCommentDTO(row: {
   cardId: string;
   body: string;
   createdAt: Date;
-  author: { id: string; name: string; image: string | null };
+  author: AuthorDTO;
 }): CommentDTO {
   return {
     id: row.id,

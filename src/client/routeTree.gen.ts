@@ -13,6 +13,7 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthedSettingsRouteImport } from './routes/_authed/settings'
 import { Route as AuthedBoardsIndexRouteImport } from './routes/_authed/boards/index'
 import { Route as AuthedBoardsBoardIdRouteImport } from './routes/_authed/boards/$boardId'
 
@@ -35,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthedSettingsRoute = AuthedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedBoardsIndexRoute = AuthedBoardsIndexRouteImport.update({
   id: '/boards/',
   path: '/boards/',
@@ -50,6 +56,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/settings': typeof AuthedSettingsRoute
   '/boards/$boardId': typeof AuthedBoardsBoardIdRoute
   '/boards/': typeof AuthedBoardsIndexRoute
 }
@@ -57,6 +64,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/settings': typeof AuthedSettingsRoute
   '/boards/$boardId': typeof AuthedBoardsBoardIdRoute
   '/boards': typeof AuthedBoardsIndexRoute
 }
@@ -66,20 +74,28 @@ export interface FileRoutesById {
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/_authed/settings': typeof AuthedSettingsRoute
   '/_authed/boards/$boardId': typeof AuthedBoardsBoardIdRoute
   '/_authed/boards/': typeof AuthedBoardsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/signup' | '/boards/$boardId' | '/boards/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/settings'
+    | '/boards/$boardId'
+    | '/boards/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/signup' | '/boards/$boardId' | '/boards'
+  to: '/' | '/login' | '/signup' | '/settings' | '/boards/$boardId' | '/boards'
   id:
     | '__root__'
     | '/'
     | '/_authed'
     | '/login'
     | '/signup'
+    | '/_authed/settings'
     | '/_authed/boards/$boardId'
     | '/_authed/boards/'
   fileRoutesById: FileRoutesById
@@ -121,6 +137,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authed/settings': {
+      id: '/_authed/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthedSettingsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/boards/': {
       id: '/_authed/boards/'
       path: '/boards'
@@ -139,11 +162,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthedRouteChildren {
+  AuthedSettingsRoute: typeof AuthedSettingsRoute
   AuthedBoardsBoardIdRoute: typeof AuthedBoardsBoardIdRoute
   AuthedBoardsIndexRoute: typeof AuthedBoardsIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedSettingsRoute: AuthedSettingsRoute,
   AuthedBoardsBoardIdRoute: AuthedBoardsBoardIdRoute,
   AuthedBoardsIndexRoute: AuthedBoardsIndexRoute,
 }

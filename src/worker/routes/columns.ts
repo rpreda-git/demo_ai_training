@@ -5,8 +5,8 @@ import { eq } from "drizzle-orm";
 import type { AppEnv } from "../lib/context";
 import { requireAuth } from "../lib/middleware";
 import { card, column } from "../db/schema";
-import { ownedColumn } from "../lib/resources";
-import { toCardDTO, toColumnDTO } from "../lib/serializers";
+import { accessibleColumn } from "../lib/resources";
+import { EMPTY_CARD_EXTRAS, toCardDTO, toColumnDTO } from "../lib/serializers";
 
 const POS_STEP = 1000;
 
@@ -24,7 +24,7 @@ export const columnsRouter = new Hono<AppEnv>()
     ),
     async (c) => {
       const db = c.get("db");
-      const existing = await ownedColumn(db, c.req.param("columnId"), c.get("user").id);
+      const existing = await accessibleColumn(db, c.req.param("columnId"), c.get("user").id);
       const input = c.req.valid("json");
       const [updated] = await db
         .update(column)
@@ -40,7 +40,7 @@ export const columnsRouter = new Hono<AppEnv>()
 
   .delete("/:columnId", async (c) => {
     const db = c.get("db");
-    const existing = await ownedColumn(db, c.req.param("columnId"), c.get("user").id);
+    const existing = await accessibleColumn(db, c.req.param("columnId"), c.get("user").id);
     await db.delete(column).where(eq(column.id, existing.id));
     return c.body(null, 204);
   })
@@ -51,7 +51,7 @@ export const columnsRouter = new Hono<AppEnv>()
     zValidator("json", z.object({ title: z.string().trim().min(1).max(200) })),
     async (c) => {
       const db = c.get("db");
-      const col = await ownedColumn(db, c.req.param("columnId"), c.get("user").id);
+      const col = await accessibleColumn(db, c.req.param("columnId"), c.get("user").id);
       const last = await db.query.card.findFirst({
         where: eq(card.columnId, col.id),
         orderBy: (cd, { desc }) => [desc(cd.position)],
@@ -66,6 +66,6 @@ export const columnsRouter = new Hono<AppEnv>()
           position,
         })
         .returning();
-      return c.json(toCardDTO(created, [], 0), 201);
+      return c.json(toCardDTO(created, EMPTY_CARD_EXTRAS), 201);
     },
   );

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { BoardDetailDTO, CardDetailDTO, CardDTO } from "@shared/types";
+import type { BoardDetailDTO, CardDetailDTO, CardDTO, ChecklistItemDTO } from "@shared/types";
 import { api, ApiError } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import * as cache from "@/lib/board-cache";
@@ -69,5 +69,69 @@ export function useCardActions(boardId: string, cardId: string) {
     onError: (e) => toast.error(message(e)),
   });
 
-  return { addComment, deleteComment, toggleLabel };
+  const setAssignee = useMutation({
+    mutationFn: (assigneeId: string | null) => api.updateCard(cardId, { assigneeId }),
+    onSuccess: (card) => {
+      patchCardDetail((detail) => ({ ...detail, assignee: card.assignee }));
+      patchBoardCard({ assignee: card.assignee });
+    },
+    onError: (e) => toast.error(message(e)),
+  });
+
+  // After the checklist changes, mirror the totals onto the board card.
+  const syncChecklist = (checklist: ChecklistItemDTO[]) =>
+    patchBoardCard({
+      checklistTotal: checklist.length,
+      checklistDone: checklist.filter((i) => i.completed).length,
+    });
+
+  const addChecklistItem = useMutation({
+    mutationFn: (text: string) => api.addChecklistItem(cardId, text),
+    onSuccess: (item) => {
+      let next: ChecklistItemDTO[] = [];
+      patchCardDetail((d) => {
+        next = [...d.checklist, item];
+        return { ...d, checklist: next };
+      });
+      syncChecklist(next);
+    },
+    onError: (e) => toast.error(message(e)),
+  });
+
+  const toggleChecklistItem = useMutation({
+    mutationFn: (vars: { itemId: string; completed: boolean }) =>
+      api.updateChecklistItem(vars.itemId, { completed: vars.completed }),
+    onSuccess: (item) => {
+      let next: ChecklistItemDTO[] = [];
+      patchCardDetail((d) => {
+        next = d.checklist.map((i) => (i.id === item.id ? item : i));
+        return { ...d, checklist: next };
+      });
+      syncChecklist(next);
+    },
+    onError: (e) => toast.error(message(e)),
+  });
+
+  const deleteChecklistItem = useMutation({
+    mutationFn: (itemId: string) => api.deleteChecklistItem(itemId),
+    onSuccess: (_res, itemId) => {
+      let next: ChecklistItemDTO[] = [];
+      patchCardDetail((d) => {
+        next = d.checklist.filter((i) => i.id !== itemId);
+        return { ...d, checklist: next };
+      });
+      syncChecklist(next);
+    },
+    onError: (e) => toast.error(message(e)),
+  });
+
+  return {
+    addComment,
+    deleteComment,
+    toggleLabel,
+    setAssignee,
+    addChecklistItem,
+    toggleChecklistItem,
+    deleteChecklistItem,
+  };
 }

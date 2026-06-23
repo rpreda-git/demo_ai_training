@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
-import { Columns3, MoreHorizontal, Pencil, SquareStack, Trash2 } from "lucide-react";
+import { Columns3, MoreHorizontal, Pencil, SquareStack, Trash2, Users } from "lucide-react";
 import type { BoardSummaryDTO } from "@shared/types";
 import { BOARD_COLORS } from "@shared/types";
+import { Badge } from "@/components/ui/badge";
 import { useDeleteBoard, useUpdateBoard } from "@/hooks/use-boards";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +58,11 @@ export function BoardTile({ board }: { board: BoardSummaryDTO }) {
         >
           <div className="flex items-start justify-between gap-2">
             <h3 className="line-clamp-1 font-semibold">{board.title}</h3>
+            {board.role !== "owner" && (
+              <Badge variant="secondary" className="shrink-0">
+                Shared
+              </Badge>
+            )}
           </div>
           <p className="text-muted-foreground line-clamp-2 min-h-[2.5rem] text-sm">
             {board.description || "No description"}
@@ -68,6 +74,11 @@ export function BoardTile({ board }: { board: BoardSummaryDTO }) {
             <span className="flex items-center gap-1">
               <SquareStack className="size-3.5" /> {board.cardCount}
             </span>
+            {board.memberCount > 1 && (
+              <span className="flex items-center gap-1">
+                <Users className="size-3.5" /> {board.memberCount}
+              </span>
+            )}
             <span className="ml-auto">
               {formatDistanceToNow(new Date(board.updatedAt), { addSuffix: true })}
             </span>
@@ -90,9 +101,11 @@ export function BoardTile({ board }: { board: BoardSummaryDTO }) {
               <DropdownMenuItem onSelect={() => setEditing(true)}>
                 <Pencil className="size-4" /> Edit
               </DropdownMenuItem>
-              <DropdownMenuItem variant="destructive" onSelect={() => setConfirming(true)}>
-                <Trash2 className="size-4" /> Delete
-              </DropdownMenuItem>
+              {board.role === "owner" && (
+                <DropdownMenuItem variant="destructive" onSelect={() => setConfirming(true)}>
+                  <Trash2 className="size-4" /> Delete
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

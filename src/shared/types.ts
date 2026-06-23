@@ -24,6 +24,24 @@ export interface CommentDTO {
   author: AuthorDTO;
 }
 
+export type BoardRole = "owner" | "editor";
+
+export interface MemberDTO {
+  userId: string;
+  name: string;
+  email: string;
+  image: string | null;
+  role: BoardRole;
+}
+
+export interface ChecklistItemDTO {
+  id: string;
+  cardId: string;
+  text: string;
+  completed: boolean;
+  position: number;
+}
+
 export interface CardDTO {
   id: string;
   columnId: string;
@@ -37,6 +55,9 @@ export interface CardDTO {
   updatedAt: string;
   labels: LabelDTO[];
   commentCount: number;
+  assignee: AuthorDTO | null;
+  checklistTotal: number;
+  checklistDone: number;
 }
 
 export interface ColumnDTO {
@@ -56,6 +77,8 @@ export interface BoardSummaryDTO {
   updatedAt: string;
   columnCount: number;
   cardCount: number;
+  role: BoardRole;
+  memberCount: number;
 }
 
 export interface BoardDetailDTO {
@@ -67,10 +90,13 @@ export interface BoardDetailDTO {
   updatedAt: string;
   columns: ColumnDTO[];
   labels: LabelDTO[];
+  members: MemberDTO[];
+  role: BoardRole;
 }
 
 export interface CardDetailDTO extends CardDTO {
   comments: CommentDTO[];
+  checklist: ChecklistItemDTO[];
 }
 
 export interface ApiError {

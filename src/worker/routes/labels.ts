@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import type { AppEnv } from "../lib/context";
 import { requireAuth } from "../lib/middleware";
 import { label } from "../db/schema";
-import { ownedLabel } from "../lib/resources";
+import { accessibleLabel } from "../lib/resources";
 import { toLabelDTO } from "../lib/serializers";
 import { LABEL_COLORS } from "@shared/types";
 
@@ -23,7 +23,7 @@ export const labelsRouter = new Hono<AppEnv>()
     ),
     async (c) => {
       const db = c.get("db");
-      const existing = await ownedLabel(db, c.req.param("labelId"), c.get("user").id);
+      const existing = await accessibleLabel(db, c.req.param("labelId"), c.get("user").id);
       const input = c.req.valid("json");
       const [updated] = await db
         .update(label)
@@ -36,7 +36,7 @@ export const labelsRouter = new Hono<AppEnv>()
 
   .delete("/:labelId", async (c) => {
     const db = c.get("db");
-    const existing = await ownedLabel(db, c.req.param("labelId"), c.get("user").id);
+    const existing = await accessibleLabel(db, c.req.param("labelId"), c.get("user").id);
     await db.delete(label).where(eq(label.id, existing.id));
     return c.body(null, 204);
   });

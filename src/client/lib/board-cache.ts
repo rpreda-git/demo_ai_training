@@ -1,4 +1,4 @@
-import type { BoardDetailDTO, CardDTO, ColumnDTO } from "@shared/types";
+import type { BoardDetailDTO, CardDTO, ColumnDTO, MemberDTO } from "@shared/types";
 
 /** Immutable helpers for editing a cached BoardDetailDTO (used by optimistic updates + DnD). */
 
@@ -102,6 +102,24 @@ export function moveCard(
   });
 
   return setColumns(board, next);
+}
+
+export function addMember(board: BoardDetailDTO, member: MemberDTO): BoardDetailDTO {
+  return { ...board, members: [...board.members, member] };
+}
+
+/** Removes a member and clears them from any card they were assigned to. */
+export function removeMember(board: BoardDetailDTO, userId: string): BoardDetailDTO {
+  const cleared = setColumns(
+    board,
+    board.columns.map((col) => ({
+      ...col,
+      cards: col.cards.map((card) =>
+        card.assignee?.id === userId ? { ...card, assignee: null } : card,
+      ),
+    })),
+  );
+  return { ...cleared, members: cleared.members.filter((m) => m.userId !== userId) };
 }
 
 const POS_STEP = 1000;
