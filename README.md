@@ -16,15 +16,21 @@ A mildly complex Trello-style Kanban app built to demo a modern full-stack TypeS
 
 ## Features
 
-- Email/password auth with sessions (Better Auth) and guarded routes
-- User settings: update name/avatar and change password
-- Boards → columns → cards, with labels, due dates, completion, comments and **checklists** (with progress)
-- **Board sharing**: invite existing users as members (role-based: owner vs editor), assign cards to members
-- **Filtering** by text, label, due window, and assignee — persisted in the URL via TanStack Router search params
+- Email/password auth with sessions (Better Auth), guarded routes, and **two-factor (TOTP)** with QR + backup codes
+- **Organizations / multi-tenancy**: every board belongs to an organization; org members (owner/admin/member) share all of its boards; org switcher + invite-by-email
+- User settings: update name/avatar, change password, enable/disable 2FA
+- Boards → columns → cards, with labels, due dates, priority, completion, comments and **checklists** (with progress)
+- Assign cards to organization members
+- **Three views** over the same data: Kanban (drag-and-drop), sortable **Table**, and month **Calendar** (by due date)
+- **Filtering** by text, label, due window, assignee, and priority — persisted in the URL via TanStack Router search params
+- **Activity log** per board (created / moved / assigned / completed / commented)
 - Drag-and-drop cards within and across columns, persisted with fractional positions
 - Optimistic UI for every mutation (TanStack Query cache updates + rollback on error)
 - Polished, responsive shadcn UI with light/dark theme toggle
-- Seeded demo account so the app looks alive on first open
+- Seeded demo account + a second account to demo collaboration
+
+> Passkeys/WebAuthn were scoped but not shipped: the pinned Better Auth version doesn't
+> expose a passkey plugin, so it would need an extra package and a real device to verify.
 
 ## Architecture
 
