@@ -1,40 +1,79 @@
 import { and, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import type { DB } from "../db";
-import { board, boardMember, card, column, comment, label } from "../db/schema";
-import type { BoardRole, BoardRow, CardRow, ColumnRow, LabelRow } from "../db/schema";
+import { board, card, column, comment, label, orgMember, user } from "../db/schema";
+import type { BoardRow, CardRow, ColumnRow, LabelRow, OrgRole } from "../db/schema";
 
 const notFound = (what: string) => new HTTPException(404, { message: `${what} not found` });
 
+/** Resolves the user's active organization (falling back to their first membership). */
+export async function activeOrg(
+  db: DB,
+  userId: string,
+): Promise<{ organizationId: string; role: OrgRole }> {
+  const u = await db.query.user.findFirst({
+    where: eq(user.id, userId),
+    columns: { activeOrganizationId: true },
+  });
+
+  if (u?.activeOrganizationId) {
+    const m = await db.query.orgMember.findFirst({
+      where: and(
+        eq(orgMember.organizationId, u.activeOrganizationId),
+        eq(orgMember.userId, userId),
+      ),
+    });
+    if (m) return { organizationId: m.organizationId, role: m.role };
+  }
+
+  const first = await db.query.orgMember.findFirst({
+    where: eq(orgMember.userId, userId),
+    orderBy: (m, { asc }) => [asc(m.createdAt)],
+  });
+  if (!first) throw new HTTPException(400, { message: "You have no organization" });
+
+  await db
+    .update(user)
+    .set({ activeOrganizationId: first.organizationId })
+    .where(eq(user.id, userId));
+  return { organizationId: first.organizationId, role: first.role };
+}
+
+export async function orgRole(
+  db: DB,
+  organizationId: string,
+  userId: string,
+): Promise<OrgRole | undefined> {
+  const m = await db.query.orgMember.findFirst({
+    where: and(eq(orgMember.organizationId, organizationId), eq(orgMember.userId, userId)),
+  });
+  return m?.role;
+}
+
+/** Throws 403 unless the role can manage the org (owner or admin). */
+export function requireOrgManager(role: OrgRole): void {
+  if (role !== "owner" && role !== "admin") {
+    throw new HTTPException(403, { message: "Requires admin or owner" });
+  }
+}
+
 export interface BoardAccess {
   board: BoardRow;
-  role: BoardRole;
+  /** The user's role in the board's organization. */
+  role: OrgRole;
 }
 
-/**
- * Loads a board the user can access (owner or member) along with their role.
- * Throws 404 (not 403) when there is no access, so board existence isn't leaked.
- */
+/** Loads a board the user can access via org membership, with their org role. */
 export async function boardAccess(db: DB, boardId: string, userId: string): Promise<BoardAccess> {
   const row = await db.query.board.findFirst({ where: eq(board.id, boardId) });
-  if (!row) throw notFound("Board");
-  const membership = await db.query.boardMember.findFirst({
-    where: and(eq(boardMember.boardId, boardId), eq(boardMember.userId, userId)),
-  });
-  if (!membership) throw notFound("Board");
-  return { board: row, role: membership.role };
+  if (!row || !row.organizationId) throw notFound("Board");
+  const role = await orgRole(db, row.organizationId, userId);
+  if (!role) throw notFound("Board");
+  return { board: row, role };
 }
 
-/** Like {@link boardAccess} but returns just the board row. */
 export async function accessibleBoard(db: DB, boardId: string, userId: string): Promise<BoardRow> {
   return (await boardAccess(db, boardId, userId)).board;
-}
-
-/** Throws 403 unless the access role is "owner". */
-export function requireOwner(access: BoardAccess): void {
-  if (access.role !== "owner") {
-    throw new HTTPException(403, { message: "Only the board owner can do this" });
-  }
 }
 
 export async function accessibleColumn(db: DB, columnId: string, userId: string): Promise<ColumnRow> {

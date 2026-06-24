@@ -15,6 +15,20 @@
       "when": 1782238988019,
       "tag": "0001_collaboration",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782286672224,
+      "tag": "0002_organizations",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1782286713831,
+      "tag": "0003_drop_board_member",
+      "breakpoints": true
     }
   ]
 }

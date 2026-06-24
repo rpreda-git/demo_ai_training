@@ -5,7 +5,7 @@ import { and, asc, count, eq } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../lib/context";
 import { requireAuth } from "../lib/middleware";
-import { boardMember, card, cardLabel, checklistItem, comment, user } from "../db/schema";
+import { board, card, cardLabel, checklistItem, comment, orgMember, user } from "../db/schema";
 import type { CardRow } from "../db/schema";
 import { accessibleCard, accessibleColumn, accessibleLabel } from "../lib/resources";
 import {
@@ -110,13 +110,18 @@ export const cardsRouter = new Hono<AppEnv>()
         if (input.assigneeId === null) {
           assigneeId = null;
         } else {
-          const member = await db.query.boardMember.findFirst({
-            where: and(
-              eq(boardMember.boardId, existing.boardId),
-              eq(boardMember.userId, input.assigneeId),
-            ),
-          });
-          if (!member) throw new HTTPException(400, { message: "Assignee must be a board member" });
+          const b = await db.query.board.findFirst({ where: eq(board.id, existing.boardId) });
+          const member = b?.organizationId
+            ? await db.query.orgMember.findFirst({
+                where: and(
+                  eq(orgMember.organizationId, b.organizationId),
+                  eq(orgMember.userId, input.assigneeId),
+                ),
+              })
+            : undefined;
+          if (!member) {
+            throw new HTTPException(400, { message: "Assignee must be an organization member" });
+          }
           assigneeId = input.assigneeId;
         }
       }

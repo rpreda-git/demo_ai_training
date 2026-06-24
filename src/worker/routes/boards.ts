@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { asc, count, desc, eq, inArray } from "drizzle-orm";
 import type { AppEnv } from "../lib/context";
 import { requireAuth } from "../lib/middleware";
-import { board, boardMember, card, column, comment, label } from "../db/schema";
-import { accessibleBoard, boardAccess, requireOwner } from "../lib/resources";
+import { board, card, column, comment, label, orgMember } from "../db/schema";
+import { accessibleBoard, activeOrg, boardAccess, requireOrgManager } from "../lib/resources";
 import {
   toBoardSummaryDTO,
   toCardDTO,
@@ -31,57 +31,61 @@ const updateBoardSchema = z.object({
   color: z.enum(BOARD_COLORS).optional(),
 });
 
-async function boardCounts(db: AppEnv["Variables"]["db"], boardId: string) {
-  const [[{ columnCount }], [{ cardCount }], [{ memberCount }]] = await Promise.all([
+const orgMemberCount = async (db: AppEnv["Variables"]["db"], orgId: string) => {
+  const [{ n }] = await db
+    .select({ n: count() })
+    .from(orgMember)
+    .where(eq(orgMember.organizationId, orgId));
+  return n;
+};
+
+async function cardColumnCounts(db: AppEnv["Variables"]["db"], boardId: string) {
+  const [[{ columnCount }], [{ cardCount }]] = await Promise.all([
     db.select({ columnCount: count() }).from(column).where(eq(column.boardId, boardId)),
     db.select({ cardCount: count() }).from(card).where(eq(card.boardId, boardId)),
-    db.select({ memberCount: count() }).from(boardMember).where(eq(boardMember.boardId, boardId)),
   ]);
-  return { columnCount, cardCount, memberCount };
+  return { columnCount, cardCount };
 }
 
 export const boardsRouter = new Hono<AppEnv>()
   .use(requireAuth)
 
-  // List every board the user owns or is a member of.
+  // Boards in the user's active organization.
   .get("/", async (c) => {
     const db = c.get("db");
-    const userId = c.get("user").id;
+    const { organizationId, role } = await activeOrg(db, c.get("user").id);
 
-    const rows = await db
-      .select({ board, role: boardMember.role })
-      .from(boardMember)
-      .innerJoin(board, eq(board.id, boardMember.boardId))
-      .where(eq(boardMember.userId, userId))
-      .orderBy(desc(board.updatedAt));
+    const boards = await db.query.board.findMany({
+      where: eq(board.organizationId, organizationId),
+      orderBy: [desc(board.updatedAt)],
+    });
+    const memberCount = await orgMemberCount(db, organizationId);
 
     const summaries = await Promise.all(
-      rows.map(async ({ board: b, role }) => {
-        const counts = await boardCounts(db, b.id);
-        return toBoardSummaryDTO(b, { ...counts, role });
-      }),
+      boards.map(async (b) =>
+        toBoardSummaryDTO(b, { ...(await cardColumnCounts(db, b.id)), role, memberCount }),
+      ),
     );
-
     return c.json(summaries);
   })
 
-  // Create a board (pre-populated) and register the creator as its owner.
+  // Create a board in the active organization (pre-populated).
   .post("/", zValidator("json", createBoardSchema), async (c) => {
     const db = c.get("db");
     const userId = c.get("user").id;
+    const { organizationId, role } = await activeOrg(db, userId);
     const input = c.req.valid("json");
 
     const [created] = await db
       .insert(board)
       .values({
+        organizationId,
         ownerId: userId,
         title: input.title,
         description: input.description,
         color: input.color ?? BOARD_COLORS[0],
       })
       .returning();
-
-    await db.insert(boardMember).values({ boardId: created.id, userId, role: "owner" });
 
     await db.insert(column).values([
       { boardId: created.id, title: "To Do", position: POS_STEP },
@@ -97,16 +101,20 @@ export const boardsRouter = new Hono<AppEnv>()
     ]);
 
     return c.json(
-      toBoardSummaryDTO(created, { columnCount: 3, cardCount: 0, role: "owner", memberCount: 1 }),
+      toBoardSummaryDTO(created, {
+        columnCount: 3,
+        cardCount: 0,
+        role,
+        memberCount: await orgMemberCount(db, organizationId),
+      }),
       201,
     );
   })
 
-  // Full board with columns, cards (labels/assignee/checklist counts), members.
+  // Full board with columns/cards and the organization's members.
   .get("/:boardId", async (c) => {
     const db = c.get("db");
-    const userId = c.get("user").id;
-    const access = await boardAccess(db, c.req.param("boardId"), userId);
+    const access = await boardAccess(db, c.req.param("boardId"), c.get("user").id);
     const boardRow = access.board;
 
     const columns = await db.query.column.findMany({
@@ -140,8 +148,8 @@ export const boardsRouter = new Hono<AppEnv>()
       orderBy: (l, { asc: a }) => [a(l.name)],
     });
 
-    const members = await db.query.boardMember.findMany({
-      where: eq(boardMember.boardId, boardRow.id),
+    const members = await db.query.orgMember.findMany({
+      where: eq(orgMember.organizationId, boardRow.organizationId!),
       with: { user: true },
       orderBy: (m, { asc: a }) => [a(m.createdAt)],
     });
@@ -163,6 +171,7 @@ export const boardsRouter = new Hono<AppEnv>()
 
     const detail: BoardDetailDTO = {
       id: boardRow.id,
+      organizationId: boardRow.organizationId!,
       title: boardRow.title,
       description: boardRow.description,
       color: boardRow.color,
@@ -177,11 +186,10 @@ export const boardsRouter = new Hono<AppEnv>()
     return c.json(detail);
   })
 
-  // Any member may edit board settings.
+  // Any org member may edit board settings.
   .patch("/:boardId", zValidator("json", updateBoardSchema), async (c) => {
     const db = c.get("db");
-    const userId = c.get("user").id;
-    const access = await boardAccess(db, c.req.param("boardId"), userId);
+    const access = await boardAccess(db, c.req.param("boardId"), c.get("user").id);
     const existing = access.board;
     const input = c.req.valid("json");
 
@@ -195,15 +203,20 @@ export const boardsRouter = new Hono<AppEnv>()
       .where(eq(board.id, existing.id))
       .returning();
 
-    const counts = await boardCounts(db, existing.id);
-    return c.json(toBoardSummaryDTO(updated, { ...counts, role: access.role }));
+    return c.json(
+      toBoardSummaryDTO(updated, {
+        ...(await cardColumnCounts(db, existing.id)),
+        role: access.role,
+        memberCount: await orgMemberCount(db, existing.organizationId!),
+      }),
+    );
   })
 
-  // Only the owner may delete a board.
+  // Owners/admins may delete a board.
   .delete("/:boardId", async (c) => {
     const db = c.get("db");
     const access = await boardAccess(db, c.req.param("boardId"), c.get("user").id);
-    requireOwner(access);
+    requireOrgManager(access.role);
     await db.delete(board).where(eq(board.id, access.board.id));
     return c.body(null, 204);
   })
@@ -245,79 +258,4 @@ export const boardsRouter = new Hono<AppEnv>()
         .returning();
       return c.json(toLabelDTO(created), 201);
     },
-  )
-
-  // --- Members --------------------------------------------------------------
-
-  .get("/:boardId/members", async (c) => {
-    const db = c.get("db");
-    await accessibleBoard(db, c.req.param("boardId"), c.get("user").id);
-    const members = await db.query.boardMember.findMany({
-      where: eq(boardMember.boardId, c.req.param("boardId")),
-      with: { user: true },
-      orderBy: (m, { asc: a }) => [a(m.createdAt)],
-    });
-    return c.json(members.map((m) => toMemberDTO({ role: m.role, user: m.user })));
-  })
-
-  // Invite an existing user by email (owner only).
-  .post(
-    "/:boardId/members",
-    zValidator("json", z.object({ email: z.string().trim().toLowerCase().email() })),
-    async (c) => {
-      const db = c.get("db");
-      const access = await boardAccess(db, c.req.param("boardId"), c.get("user").id);
-      requireOwner(access);
-
-      const invitee = await db.query.user.findFirst({
-        where: (u, { eq: e }) => e(u.email, c.req.valid("json").email),
-      });
-      if (!invitee) {
-        return c.json({ error: "No user with that email. They must sign up first." }, 404);
-      }
-
-      const existing = await db.query.boardMember.findFirst({
-        where: and(
-          eq(boardMember.boardId, access.board.id),
-          eq(boardMember.userId, invitee.id),
-        ),
-      });
-      if (existing) return c.json({ error: "Already a member" }, 409);
-
-      await db
-        .insert(boardMember)
-        .values({ boardId: access.board.id, userId: invitee.id, role: "editor" });
-
-      return c.json(
-        toMemberDTO({
-          role: "editor",
-          user: { id: invitee.id, name: invitee.name, email: invitee.email, image: invitee.image },
-        }),
-        201,
-      );
-    },
-  )
-
-  // Remove a member (owner only; the owner cannot remove themselves).
-  .delete("/:boardId/members/:userId", async (c) => {
-    const db = c.get("db");
-    const access = await boardAccess(db, c.req.param("boardId"), c.get("user").id);
-    requireOwner(access);
-
-    const targetId = c.req.param("userId");
-    if (targetId === access.board.ownerId) {
-      return c.json({ error: "The owner cannot be removed" }, 400);
-    }
-
-    // Unassign the removed user from this board's cards.
-    await db
-      .update(card)
-      .set({ assigneeId: null })
-      .where(and(eq(card.boardId, access.board.id), eq(card.assigneeId, targetId)));
-
-    await db
-      .delete(boardMember)
-      .where(and(eq(boardMember.boardId, access.board.id), eq(boardMember.userId, targetId)));
-
-    return c.body(null, 204);
-  });
+  );

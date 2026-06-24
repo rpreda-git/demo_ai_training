@@ -103,18 +103,32 @@ export function useBoardActions(boardId: string) {
     onError: (e) => toast.error(message(e)),
   });
 
+  const orgId = () => qc.getQueryData<BoardDetailDTO>(key)?.organizationId;
+
   const addMember = useMutation({
-    mutationFn: (email: string) => api.addMember(boardId, email),
+    mutationFn: (email: string) => {
+      const id = orgId();
+      if (!id) throw new ApiError(400, "No organization");
+      return api.addOrgMember(id, email);
+    },
     onSuccess: (member) => {
       write((b) => cache.addMember(b, member));
+      qc.invalidateQueries({ queryKey: queryKeys.boards });
       toast.success(`Added ${member.name}`);
     },
     onError: (e) => toast.error(message(e)),
   });
 
   const removeMember = useMutation({
-    mutationFn: (userId: string) => api.removeMember(boardId, userId),
-    onSuccess: (_res, userId) => write((b) => cache.removeMember(b, userId)),
+    mutationFn: (userId: string) => {
+      const id = orgId();
+      if (!id) throw new ApiError(400, "No organization");
+      return api.removeOrgMember(id, userId);
+    },
+    onSuccess: (_res, userId) => {
+      write((b) => cache.removeMember(b, userId));
+      qc.invalidateQueries({ queryKey: queryKeys.boards });
+    },
     onError: (e) => toast.error(message(e)),
   });
 

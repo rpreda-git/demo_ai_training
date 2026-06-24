@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { UserPlus, Users, X } from "lucide-react";
-import type { BoardRole, MemberDTO } from "@shared/types";
+import type { MemberDTO, OrgRole } from "@shared/types";
 import { useBoardActions } from "@/hooks/use-board";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,12 +22,12 @@ export function BoardMembersDialog({
 }: {
   boardId: string;
   members: MemberDTO[];
-  role: BoardRole;
+  role: OrgRole;
 }) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const { addMember, removeMember } = useBoardActions(boardId);
-  const isOwner = role === "owner";
+  const canManage = role === "owner" || role === "admin";
 
   function invite(e: React.FormEvent) {
     e.preventDefault();
@@ -48,15 +48,15 @@ export function BoardMembersDialog({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Share board</DialogTitle>
+          <DialogTitle>Workspace members</DialogTitle>
           <DialogDescription>
-            {isOwner
-              ? "Invite people by the email they signed up with."
-              : "People with access to this board."}
+            {canManage
+              ? "Anyone you add can access every board in this workspace."
+              : "People with access to this workspace."}
           </DialogDescription>
         </DialogHeader>
 
-        {isOwner && (
+        {canManage && (
           <form onSubmit={invite} className="flex gap-2">
             <Input
               type="email"
@@ -79,7 +79,7 @@ export function BoardMembersDialog({
                 <div className="text-muted-foreground truncate text-xs">{m.email}</div>
               </div>
               <Badge variant={m.role === "owner" ? "default" : "secondary"}>{m.role}</Badge>
-              {isOwner && m.role !== "owner" && (
+              {canManage && m.role !== "owner" && (
                 <Button
                   variant="ghost"
                   size="icon"

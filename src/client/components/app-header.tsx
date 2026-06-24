@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { signOut, useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
+import { OrgSwitcher } from "@/components/org-switcher";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -44,6 +45,9 @@ export function AppHeader() {
           </span>
           <span className="hidden sm:inline">Kanban</span>
         </Link>
+
+        <span className="bg-border h-5 w-px" />
+        <OrgSwitcher />
 
         <div className="flex-1" />
 

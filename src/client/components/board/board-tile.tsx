@@ -101,7 +101,7 @@ export function BoardTile({ board }: { board: BoardSummaryDTO }) {
               <DropdownMenuItem onSelect={() => setEditing(true)}>
                 <Pencil className="size-4" /> Edit
               </DropdownMenuItem>
-              {board.role === "owner" && (
+              {(board.role === "owner" || board.role === "admin") && (
                 <DropdownMenuItem variant="destructive" onSelect={() => setConfirming(true)}>
                   <Trash2 className="size-4" /> Delete
                 </DropdownMenuItem>

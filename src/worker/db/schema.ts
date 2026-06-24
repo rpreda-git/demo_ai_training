@@ -1,4 +1,12 @@
-import { sqliteTable, text, integer, real, primaryKey, index } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  real,
+  primaryKey,
+  index,
+  type AnySQLiteColumn,
+} from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 
 const id = () =>
@@ -29,6 +37,11 @@ export const user = sqliteTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
   image: text("image"),
+  // The organization whose boards the user is currently viewing.
+  activeOrganizationId: text("active_organization_id").references(
+    (): AnySQLiteColumn => organization.id,
+    { onDelete: "set null" },
+  ),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -79,6 +92,10 @@ export const verification = sqliteTable("verification", {
 
 export const board = sqliteTable("board", {
   id: id(),
+  // Nullable in the DB to keep the migration simple; always set by the app.
+  organizationId: text("organization_id").references(() => organization.id, {
+    onDelete: "cascade",
+  }),
   ownerId: text("owner_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
@@ -182,22 +199,34 @@ export const comment = sqliteTable(
   (t) => [index("comment_card_idx").on(t.cardId)],
 );
 
-export const boardMember = sqliteTable(
-  "board_member",
+export const organization = sqliteTable("organization", {
+  id: id(),
+  name: text("name").notNull(),
+  ownerId: text("owner_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  createdAt: createdAt(),
+});
+
+export const orgMember = sqliteTable(
+  "org_member",
   {
-    boardId: text("board_id")
+    organizationId: text("organization_id")
       .notNull()
-      .references(() => board.id, { onDelete: "cascade" }),
+      .references(() => organization.id, { onDelete: "cascade" }),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    // "owner" can manage members and delete the board; "editor" edits content.
-    role: text("role", { enum: ["owner", "editor"] })
+    // "owner" manages the org; "admin" manages members; "member" edits content.
+    role: text("role", { enum: ["owner", "admin", "member"] })
       .notNull()
-      .default("editor"),
+      .default("member"),
     createdAt: createdAt(),
   },
-  (t) => [primaryKey({ columns: [t.boardId, t.userId] }), index("board_member_user_idx").on(t.userId)],
+  (t) => [
+    primaryKey({ columns: [t.organizationId, t.userId] }),
+    index("org_member_user_idx").on(t.userId),
+  ],
 );
 
 /* -------------------------------------------------------------------------- */
@@ -206,15 +235,27 @@ export const boardMember = sqliteTable(
 
 export const boardRelations = relations(board, ({ many, one }) => ({
   owner: one(user, { fields: [board.ownerId], references: [user.id] }),
+  organization: one(organization, {
+    fields: [board.organizationId],
+    references: [organization.id],
+  }),
   columns: many(column),
   labels: many(label),
   cards: many(card),
-  members: many(boardMember),
 }));
 
-export const boardMemberRelations = relations(boardMember, ({ one }) => ({
-  board: one(board, { fields: [boardMember.boardId], references: [board.id] }),
-  user: one(user, { fields: [boardMember.userId], references: [user.id] }),
+export const organizationRelations = relations(organization, ({ many, one }) => ({
+  owner: one(user, { fields: [organization.ownerId], references: [user.id] }),
+  members: many(orgMember),
+  boards: many(board),
+}));
+
+export const orgMemberRelations = relations(orgMember, ({ one }) => ({
+  organization: one(organization, {
+    fields: [orgMember.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, { fields: [orgMember.userId], references: [user.id] }),
 }));
 
 export const columnRelations = relations(column, ({ one, many }) => ({
@@ -256,6 +297,7 @@ export type CardRow = typeof card.$inferSelect;
 export type LabelRow = typeof label.$inferSelect;
 export type CommentRow = typeof comment.$inferSelect;
 export type UserRow = typeof user.$inferSelect;
-export type BoardMemberRow = typeof boardMember.$inferSelect;
 export type ChecklistItemRow = typeof checklistItem.$inferSelect;
-export type BoardRole = BoardMemberRow["role"];
+export type OrganizationRow = typeof organization.$inferSelect;
+export type OrgMemberRow = typeof orgMember.$inferSelect;
+export type OrgRole = OrgMemberRow["role"];

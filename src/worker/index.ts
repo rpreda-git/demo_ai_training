@@ -10,6 +10,7 @@ import { cardsRouter } from "./routes/cards";
 import { labelsRouter } from "./routes/labels";
 import { commentsRouter } from "./routes/comments";
 import { checklistRouter } from "./routes/checklist";
+import { orgsRouter } from "./routes/orgs";
 
 const app = new Hono<AppEnv>();
 
@@ -27,6 +28,7 @@ const routes = app
     const u = c.get("user");
     return c.json({ id: u.id, name: u.name, email: u.email, image: u.image ?? null });
   })
+  .route("/api/orgs", orgsRouter)
   .route("/api/boards", boardsRouter)
   .route("/api/columns", columnsRouter)
   .route("/api/cards", cardsRouter)

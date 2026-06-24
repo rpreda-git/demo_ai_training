@@ -24,14 +24,22 @@ export interface CommentDTO {
   author: AuthorDTO;
 }
 
-export type BoardRole = "owner" | "editor";
+export type OrgRole = "owner" | "admin" | "member";
+
+export interface OrgDTO {
+  id: string;
+  name: string;
+  role: OrgRole;
+  memberCount: number;
+  isActive: boolean;
+}
 
 export interface MemberDTO {
   userId: string;
   name: string;
   email: string;
   image: string | null;
-  role: BoardRole;
+  role: OrgRole;
 }
 
 export interface ChecklistItemDTO {
@@ -77,12 +85,13 @@ export interface BoardSummaryDTO {
   updatedAt: string;
   columnCount: number;
   cardCount: number;
-  role: BoardRole;
+  role: OrgRole;
   memberCount: number;
 }
 
 export interface BoardDetailDTO {
   id: string;
+  organizationId: string;
   title: string;
   description: string | null;
   color: string;
@@ -91,7 +100,7 @@ export interface BoardDetailDTO {
   columns: ColumnDTO[];
   labels: LabelDTO[];
   members: MemberDTO[];
-  role: BoardRole;
+  role: OrgRole;
 }
 
 export interface CardDetailDTO extends CardDTO {

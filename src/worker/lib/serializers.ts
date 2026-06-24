@@ -7,14 +7,16 @@ import type {
   CommentDTO,
   LabelDTO,
   MemberDTO,
+  OrgDTO,
 } from "@shared/types";
 import type {
-  BoardRole,
   BoardRow,
   CardRow,
   ChecklistItemRow,
   ColumnRow,
   LabelRow,
+  OrganizationRow,
+  OrgRole,
 } from "../db/schema";
 
 const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
@@ -87,7 +89,7 @@ export function toColumnDTO(row: ColumnRow, cards: CardDTO[]): ColumnDTO {
 
 export function toBoardSummaryDTO(
   row: BoardRow,
-  meta: { columnCount: number; cardCount: number; role: BoardRole; memberCount: number },
+  meta: { columnCount: number; cardCount: number; role: OrgRole; memberCount: number },
 ): BoardSummaryDTO {
   return {
     id: row.id,
@@ -103,8 +105,21 @@ export function toBoardSummaryDTO(
   };
 }
 
+export function toOrgDTO(
+  row: OrganizationRow,
+  meta: { role: OrgRole; memberCount: number; isActive: boolean },
+): OrgDTO {
+  return {
+    id: row.id,
+    name: row.name,
+    role: meta.role,
+    memberCount: meta.memberCount,
+    isActive: meta.isActive,
+  };
+}
+
 export function toMemberDTO(row: {
-  role: BoardRole;
+  role: OrgRole;
   user: { id: string; name: string; email: string; image: string | null };
 }): MemberDTO {
   return {

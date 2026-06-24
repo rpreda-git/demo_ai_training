@@ -1,14 +1,38 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { eq } from "drizzle-orm";
 import { getDb } from "./db";
 import * as schema from "./db/schema";
 
 function buildAuth(env: Env) {
+  const db = getDb(env);
   return betterAuth({
     secret: env.BETTER_AUTH_SECRET,
     // When unset, Better Auth infers the base URL from the incoming request.
     baseURL: env.BETTER_AUTH_URL || undefined,
-    database: drizzleAdapter(getDb(env), {
+    databaseHooks: {
+      user: {
+        create: {
+          // Give every new user a personal organization to land in.
+          after: async (createdUser) => {
+            const orgId = crypto.randomUUID();
+            await db.insert(schema.organization).values({
+              id: orgId,
+              name: `${createdUser.name || "My"}'s Workspace`,
+              ownerId: createdUser.id,
+            });
+            await db
+              .insert(schema.orgMember)
+              .values({ organizationId: orgId, userId: createdUser.id, role: "owner" });
+            await db
+              .update(schema.user)
+              .set({ activeOrganizationId: orgId })
+              .where(eq(schema.user.id, createdUser.id));
+          },
+        },
+      },
+    },
+    database: drizzleAdapter(db, {
       provider: "sqlite",
       schema: {
         user: schema.user,

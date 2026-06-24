@@ -8,6 +8,7 @@ import type {
   CommentDTO,
   LabelDTO,
   MemberDTO,
+  OrgDTO,
 } from "@shared/types";
 
 export class ApiError extends Error {
@@ -105,12 +106,15 @@ export const api = {
     http<LabelDTO>(`/labels/${labelId}`, patch(data)),
   deleteLabel: (labelId: string) => http<void>(`/labels/${labelId}`, del),
 
-  // Members
-  listMembers: (boardId: string) => http<MemberDTO[]>(`/boards/${boardId}/members`),
-  addMember: (boardId: string, email: string) =>
-    http<MemberDTO>(`/boards/${boardId}/members`, body({ email })),
-  removeMember: (boardId: string, userId: string) =>
-    http<void>(`/boards/${boardId}/members/${userId}`, del),
+  // Organizations
+  listOrgs: () => http<OrgDTO[]>("/orgs"),
+  createOrg: (name: string) => http<OrgDTO>("/orgs", body({ name })),
+  switchOrg: (organizationId: string) => http<void>("/orgs/active", body({ organizationId })),
+  listOrgMembers: (orgId: string) => http<MemberDTO[]>(`/orgs/${orgId}/members`),
+  addOrgMember: (orgId: string, email: string) =>
+    http<MemberDTO>(`/orgs/${orgId}/members`, body({ email })),
+  removeOrgMember: (orgId: string, userId: string) =>
+    http<void>(`/orgs/${orgId}/members/${userId}`, del),
 
   // Checklist
   addChecklistItem: (cardId: string, text: string) =>
