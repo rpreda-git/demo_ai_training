@@ -1,0 +1,1 @@
+ALTER TABLE `card` ADD `priority` text DEFAULT 'none' NOT NULL;

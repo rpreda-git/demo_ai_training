@@ -67,6 +67,7 @@ export function toCardDTO(row: CardRow, extra: CardExtras): CardDTO {
     position: row.position,
     dueDate: iso(row.dueDate),
     completed: row.completed,
+    priority: row.priority,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     labels: extra.labels.map(toLabelDTO),

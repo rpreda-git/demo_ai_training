@@ -1,5 +1,6 @@
 import { Check, Filter, Search, X } from "lucide-react";
-import type { LabelDTO, MemberDTO } from "@shared/types";
+import type { LabelDTO, MemberDTO, Priority } from "@shared/types";
+import { PRIORITY_META } from "@shared/types";
 import { cn } from "@/lib/utils";
 import { hasActiveFilters, type BoardFilters, type DueFilter } from "@/lib/card-filters";
 import { Button } from "@/components/ui/button";
@@ -106,6 +107,31 @@ export function BoardFilterBar({
             <DropdownMenuItem key={m.userId} onSelect={() => onChange({ assignee: m.userId })}>
               {m.name}
               {filters.assignee === m.userId && <Check className="ml-auto size-4" />}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className={triggerCls(!!filters.priority)}>
+            {filters.priority && filters.priority !== "none"
+              ? PRIORITY_META[filters.priority].label
+              : "Priority"}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem onSelect={() => onChange({ priority: undefined })}>
+            Any priority
+          </DropdownMenuItem>
+          {(["urgent", "high", "medium", "low"] as Priority[]).map((p) => (
+            <DropdownMenuItem key={p} onSelect={() => onChange({ priority: p })}>
+              <span
+                className="size-2.5 rounded-full"
+                style={{ backgroundColor: PRIORITY_META[p as Exclude<Priority, "none">].color }}
+              />
+              {PRIORITY_META[p as Exclude<Priority, "none">].label}
+              {filters.priority === p && <Check className="ml-auto size-4" />}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>

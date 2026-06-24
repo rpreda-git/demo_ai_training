@@ -14,6 +14,7 @@ import {
   toChecklistItemDTO,
   toCommentDTO,
 } from "../lib/serializers";
+import { logActivity } from "../lib/activity";
 import type { DB } from "../db";
 import type { CardDetailDTO } from "@shared/types";
 
@@ -85,6 +86,7 @@ export const cardsRouter = new Hono<AppEnv>()
         description: z.string().trim().max(5000).nullable().optional(),
         dueDate: z.coerce.date().nullable().optional(),
         completed: z.boolean().optional(),
+        priority: z.enum(["none", "low", "medium", "high", "urgent"]).optional(),
         columnId: z.string().optional(),
         position: z.number().optional(),
         assigneeId: z.string().nullable().optional(),
@@ -97,15 +99,18 @@ export const cardsRouter = new Hono<AppEnv>()
       const input = c.req.valid("json");
 
       let columnId = existing.columnId;
+      let movedToColumn: string | null = null;
       if (input.columnId && input.columnId !== existing.columnId) {
         const target = await accessibleColumn(db, input.columnId, userId);
         if (target.boardId !== existing.boardId) {
           throw new HTTPException(400, { message: "Cannot move card across boards" });
         }
         columnId = target.id;
+        movedToColumn = target.title;
       }
 
       let assigneeId = existing.assigneeId;
+      let assignedName: string | null = null;
       if (input.assigneeId !== undefined) {
         if (input.assigneeId === null) {
           assigneeId = null;
@@ -117,12 +122,14 @@ export const cardsRouter = new Hono<AppEnv>()
                   eq(orgMember.organizationId, b.organizationId),
                   eq(orgMember.userId, input.assigneeId),
                 ),
+                with: { user: { columns: { name: true } } },
               })
             : undefined;
           if (!member) {
             throw new HTTPException(400, { message: "Assignee must be an organization member" });
           }
           assigneeId = input.assigneeId;
+          if (input.assigneeId !== existing.assigneeId) assignedName = member.user.name;
         }
       }
 
@@ -134,12 +141,38 @@ export const cardsRouter = new Hono<AppEnv>()
             input.description === undefined ? existing.description : input.description,
           dueDate: input.dueDate === undefined ? existing.dueDate : input.dueDate,
           completed: input.completed ?? existing.completed,
+          priority: input.priority ?? existing.priority,
           columnId,
           position: input.position ?? existing.position,
           assigneeId,
         })
         .where(eq(card.id, existing.id))
         .returning();
+
+      if (movedToColumn) {
+        await logActivity(db, {
+          boardId: existing.boardId,
+          userId,
+          type: "card.moved",
+          data: { cardTitle: updated.title, toColumn: movedToColumn },
+        });
+      }
+      if (assignedName) {
+        await logActivity(db, {
+          boardId: existing.boardId,
+          userId,
+          type: "card.assigned",
+          data: { cardTitle: updated.title, assignee: assignedName },
+        });
+      }
+      if (input.completed === true && !existing.completed) {
+        await logActivity(db, {
+          boardId: existing.boardId,
+          userId,
+          type: "card.completed",
+          data: { cardTitle: updated.title },
+        });
+      }
 
       return c.json(await cardDTO(db, updated));
     },
@@ -195,6 +228,12 @@ export const cardsRouter = new Hono<AppEnv>()
         .insert(comment)
         .values({ cardId: cardRow.id, userId: user_.id, body: c.req.valid("json").body })
         .returning();
+      await logActivity(db, {
+        boardId: cardRow.boardId,
+        userId: user_.id,
+        type: "comment.added",
+        data: { cardTitle: cardRow.title },
+      });
       return c.json(
         toCommentDTO({
           id: created.id,

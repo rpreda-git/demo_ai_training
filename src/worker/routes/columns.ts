@@ -7,6 +7,7 @@ import { requireAuth } from "../lib/middleware";
 import { card, column } from "../db/schema";
 import { accessibleColumn } from "../lib/resources";
 import { EMPTY_CARD_EXTRAS, toCardDTO, toColumnDTO } from "../lib/serializers";
+import { logActivity } from "../lib/activity";
 
 const POS_STEP = 1000;
 
@@ -66,6 +67,12 @@ export const columnsRouter = new Hono<AppEnv>()
           position,
         })
         .returning();
+      await logActivity(db, {
+        boardId: col.boardId,
+        userId: c.get("user").id,
+        type: "card.created",
+        data: { cardTitle: created.title, column: col.title },
+      });
       return c.json(toCardDTO(created, EMPTY_CARD_EXTRAS), 201);
     },
   );

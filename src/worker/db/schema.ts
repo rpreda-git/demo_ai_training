@@ -135,6 +135,9 @@ export const card = sqliteTable(
     position: real("position").notNull(),
     dueDate: integer("due_date", { mode: "timestamp" }),
     completed: integer("completed", { mode: "boolean" }).notNull().default(false),
+    priority: text("priority", { enum: ["none", "low", "medium", "high", "urgent"] })
+      .notNull()
+      .default("none"),
     assigneeId: text("assignee_id").references(() => user.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -229,6 +232,24 @@ export const orgMember = sqliteTable(
   ],
 );
 
+export const activity = sqliteTable(
+  "activity",
+  {
+    id: id(),
+    boardId: text("board_id")
+      .notNull()
+      .references(() => board.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    // Denormalized JSON snippet so the feed renders without extra joins.
+    data: text("data").notNull().default("{}"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("activity_board_idx").on(t.boardId)],
+);
+
 /* -------------------------------------------------------------------------- */
 /*  Relations (used by Drizzle's relational query API)                        */
 /* -------------------------------------------------------------------------- */
@@ -291,6 +312,10 @@ export const commentRelations = relations(comment, ({ one }) => ({
   user: one(user, { fields: [comment.userId], references: [user.id] }),
 }));
 
+export const activityRelations = relations(activity, ({ one }) => ({
+  user: one(user, { fields: [activity.userId], references: [user.id] }),
+}));
+
 export type BoardRow = typeof board.$inferSelect;
 export type ColumnRow = typeof column.$inferSelect;
 export type CardRow = typeof card.$inferSelect;
@@ -301,3 +326,4 @@ export type ChecklistItemRow = typeof checklistItem.$inferSelect;
 export type OrganizationRow = typeof organization.$inferSelect;
 export type OrgMemberRow = typeof orgMember.$inferSelect;
 export type OrgRole = OrgMemberRow["role"];
+export type ActivityRow = typeof activity.$inferSelect;

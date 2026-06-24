@@ -1,4 +1,5 @@
 import type {
+  ActivityDTO,
   BoardDetailDTO,
   BoardSummaryDTO,
   CardDetailDTO,
@@ -9,6 +10,7 @@ import type {
   LabelDTO,
   MemberDTO,
   OrgDTO,
+  Priority,
 } from "@shared/types";
 
 export class ApiError extends Error {
@@ -59,6 +61,7 @@ export const api = {
   // Boards
   listBoards: () => http<BoardSummaryDTO[]>("/boards"),
   getBoard: (boardId: string) => http<BoardDetailDTO>(`/boards/${boardId}`),
+  listActivity: (boardId: string) => http<ActivityDTO[]>(`/boards/${boardId}/activity`),
   createBoard: (data: { title: string; description?: string; color?: string }) =>
     http<BoardSummaryDTO>("/boards", body(data)),
   updateBoard: (
@@ -85,6 +88,7 @@ export const api = {
       description?: string | null;
       dueDate?: string | null;
       completed?: boolean;
+      priority?: Priority;
       columnId?: string;
       position?: number;
       assigneeId?: string | null;

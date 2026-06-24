@@ -24,6 +24,31 @@ export interface CommentDTO {
   author: AuthorDTO;
 }
 
+export type Priority = "none" | "low" | "medium" | "high" | "urgent";
+
+export const PRIORITY_RANK: Record<Priority, number> = {
+  none: 0,
+  low: 1,
+  medium: 2,
+  high: 3,
+  urgent: 4,
+};
+
+export const PRIORITY_META: Record<Exclude<Priority, "none">, { label: string; color: string }> = {
+  low: { label: "Low", color: "#64748b" },
+  medium: { label: "Medium", color: "#eab308" },
+  high: { label: "High", color: "#f97316" },
+  urgent: { label: "Urgent", color: "#ef4444" },
+};
+
+export interface ActivityDTO {
+  id: string;
+  type: string;
+  createdAt: string;
+  actor: AuthorDTO;
+  data: Record<string, string>;
+}
+
 export type OrgRole = "owner" | "admin" | "member";
 
 export interface OrgDTO {
@@ -59,6 +84,7 @@ export interface CardDTO {
   position: number;
   dueDate: string | null;
   completed: boolean;
+  priority: Priority;
   createdAt: string;
   updatedAt: string;
   labels: LabelDTO[];

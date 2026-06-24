@@ -18,6 +18,14 @@ export function useBoard(boardId: string) {
   return useQuery(boardQueryOptions(boardId));
 }
 
+export function useActivity(boardId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.activity(boardId),
+    queryFn: () => api.listActivity(boardId),
+    enabled,
+  });
+}
+
 /**
  * All board-detail mutations, each updating the cached `BoardDetailDTO`.
  * Edits/moves/deletes are optimistic; creates apply the server response so
@@ -85,6 +93,7 @@ export function useBoardActions(boardId: string) {
       if (vars.data.description !== undefined) patch.description = vars.data.description;
       if (vars.data.dueDate !== undefined) patch.dueDate = vars.data.dueDate;
       if (vars.data.completed !== undefined) patch.completed = vars.data.completed;
+      if (vars.data.priority !== undefined) patch.priority = vars.data.priority;
       if (vars.data.columnId !== undefined) patch.columnId = vars.data.columnId;
       if (vars.data.position !== undefined) patch.position = vars.data.position;
       return cache.patchCard(b, vars.cardId, patch);

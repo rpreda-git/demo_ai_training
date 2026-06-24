@@ -4,7 +4,7 @@ import { z } from "zod";
 import { asc, count, desc, eq, inArray } from "drizzle-orm";
 import type { AppEnv } from "../lib/context";
 import { requireAuth } from "../lib/middleware";
-import { board, card, column, comment, label, orgMember } from "../db/schema";
+import { activity, board, card, column, comment, label, orgMember } from "../db/schema";
 import { accessibleBoard, activeOrg, boardAccess, requireOrgManager } from "../lib/resources";
 import {
   toBoardSummaryDTO,
@@ -14,6 +14,7 @@ import {
   toMemberDTO,
   toAuthorDTO,
 } from "../lib/serializers";
+import { toActivityDTO } from "../lib/activity";
 import type { BoardDetailDTO, ColumnDTO } from "@shared/types";
 import { BOARD_COLORS, LABEL_COLORS } from "@shared/types";
 
@@ -258,4 +259,17 @@ export const boardsRouter = new Hono<AppEnv>()
         .returning();
       return c.json(toLabelDTO(created), 201);
     },
-  );
+  )
+
+  // Recent board activity (most recent first).
+  .get("/:boardId/activity", async (c) => {
+    const db = c.get("db");
+    await accessibleBoard(db, c.req.param("boardId"), c.get("user").id);
+    const rows = await db.query.activity.findMany({
+      where: eq(activity.boardId, c.req.param("boardId")),
+      orderBy: (a, { desc: d }) => [d(a.createdAt)],
+      limit: 50,
+      with: { user: true },
+    });
+    return c.json(rows.map(toActivityDTO));
+  });

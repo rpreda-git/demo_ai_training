@@ -3,6 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { format, isPast, isToday } from "date-fns";
 import { CalendarClock, CheckCircle2, CheckSquare, MessageSquare } from "lucide-react";
 import type { CardDTO } from "@shared/types";
+import { PRIORITY_META } from "@shared/types";
 import { cn } from "@/lib/utils";
 import { LabelPill } from "@/components/board/label-pill";
 import { MemberAvatar } from "@/components/board/member-avatar";
@@ -26,6 +27,11 @@ export function KanbanCardView({
         dragging && "rotate-2 shadow-lg",
         card.completed && "opacity-70",
       )}
+      style={
+        card.priority !== "none"
+          ? { borderLeftColor: PRIORITY_META[card.priority].color, borderLeftWidth: 3 }
+          : undefined
+      }
     >
       {card.labels.length > 0 && (
         <div className="flex flex-wrap gap-1">

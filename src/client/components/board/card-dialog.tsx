@@ -3,6 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import {
   CalendarClock,
   Check,
+  Flag,
   Loader2,
   Plus,
   Send,
@@ -12,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import type { CardDetailDTO, LabelDTO, MemberDTO } from "@shared/types";
+import { PRIORITY_META } from "@shared/types";
 import { useSession } from "@/lib/auth-client";
 import { useBoardActions } from "@/hooks/use-board";
 import { useCard, useCardActions } from "@/hooks/use-card";
@@ -400,6 +402,48 @@ function CardBody({
                   <DropdownMenuItem key={m.userId} onSelect={() => setAssignee.mutate(m.userId)}>
                     <MemberAvatar user={m} className="size-5" />
                     <span className="truncate">{m.name}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+              <Flag className="size-3.5" /> Priority
+            </h4>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+                  {card.priority === "none" ? (
+                    <span className="text-muted-foreground">None</span>
+                  ) : (
+                    <>
+                      <span
+                        className="size-2.5 rounded-full"
+                        style={{ backgroundColor: PRIORITY_META[card.priority].color }}
+                      />
+                      {PRIORITY_META[card.priority].label}
+                    </>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44">
+                <DropdownMenuItem
+                  onSelect={() => updateCard.mutate({ cardId: card.id, data: { priority: "none" } })}
+                >
+                  None
+                </DropdownMenuItem>
+                {(["urgent", "high", "medium", "low"] as const).map((p) => (
+                  <DropdownMenuItem
+                    key={p}
+                    onSelect={() => updateCard.mutate({ cardId: card.id, data: { priority: p } })}
+                  >
+                    <span
+                      className="size-2.5 rounded-full"
+                      style={{ backgroundColor: PRIORITY_META[p].color }}
+                    />
+                    {PRIORITY_META[p].label}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>

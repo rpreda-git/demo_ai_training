@@ -23,9 +23,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { KanbanColumn } from "@/components/board/kanban-column";
 import { KanbanCardView } from "@/components/board/kanban-card";
-import { CardDialog } from "@/components/board/card-dialog";
 
-export function KanbanBoard({ board, filters }: { board: BoardDetailDTO; filters: BoardFilters }) {
+export function KanbanBoard({
+  board,
+  filters,
+  onOpenCard,
+}: {
+  board: BoardDetailDTO;
+  filters: BoardFilters;
+  onOpenCard: (cardId: string) => void;
+}) {
   const qc = useQueryClient();
   const boardKey = queryKeys.board(board.id);
   const actions = useBoardActions(board.id);
@@ -33,7 +40,6 @@ export function KanbanBoard({ board, filters }: { board: BoardDetailDTO; filters
   const interactive = !hasActiveFilters(filters);
 
   const [activeCard, setActiveCard] = useState<CardDTO | null>(null);
-  const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [addingColumn, setAddingColumn] = useState(false);
   const [columnDraft, setColumnDraft] = useState("");
   const dragStart = useRef<{ columnId: string; index: number } | null>(null);
@@ -132,7 +138,7 @@ export function KanbanBoard({ board, filters }: { board: BoardDetailDTO; filters
                   : column.cards.filter((c) => matchesFilters(c, filters, session?.user?.id))
               }
               interactive={interactive}
-              onOpenCard={setOpenCardId}
+              onOpenCard={onOpenCard}
               onToggleComplete={(cardId, next) =>
                 actions.updateCard.mutate({ cardId, data: { completed: next } })
               }
@@ -189,15 +195,6 @@ export function KanbanBoard({ board, filters }: { board: BoardDetailDTO; filters
           ) : null}
         </DragOverlay>
       </DndContext>
-
-      <CardDialog
-        boardId={board.id}
-        cardId={openCardId}
-        labels={board.labels}
-        members={board.members}
-        open={!!openCardId}
-        onOpenChange={(open) => !open && setOpenCardId(null)}
-      />
     </>
   );
 }

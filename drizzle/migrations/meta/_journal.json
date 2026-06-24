@@ -29,6 +29,20 @@
       "when": 1782286713831,
       "tag": "0003_drop_board_member",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1782287430287,
+      "tag": "0004_card_priority",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1782287687863,
+      "tag": "0005_activity",
+      "breakpoints": true
     }
   ]
 }

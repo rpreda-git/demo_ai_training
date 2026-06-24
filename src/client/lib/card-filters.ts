@@ -1,5 +1,5 @@
 import { isPast, isThisWeek, isToday } from "date-fns";
-import type { CardDTO } from "@shared/types";
+import type { CardDTO, Priority } from "@shared/types";
 
 export type DueFilter = "overdue" | "today" | "week";
 
@@ -8,10 +8,11 @@ export interface BoardFilters {
   label?: string;
   due?: DueFilter;
   assignee?: string; // a userId, or "me"
+  priority?: Priority;
 }
 
 export function hasActiveFilters(f: BoardFilters): boolean {
-  return Boolean(f.q?.trim() || f.label || f.due || f.assignee);
+  return Boolean(f.q?.trim() || f.label || f.due || f.assignee || f.priority);
 }
 
 export function matchesFilters(
@@ -25,6 +26,7 @@ export function matchesFilters(
     if (!haystack.includes(q)) return false;
   }
   if (f.label && !card.labels.some((l) => l.id === f.label)) return false;
+  if (f.priority && card.priority !== f.priority) return false;
   if (f.assignee) {
     const wanted = f.assignee === "me" ? currentUserId : f.assignee;
     if (card.assignee?.id !== wanted) return false;
