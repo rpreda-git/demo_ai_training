@@ -43,6 +43,13 @@
       "when": 1782287687863,
       "tag": "0005_activity",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1782288291733,
+      "tag": "0006_two_factor",
+      "breakpoints": true
     }
   ]
 }

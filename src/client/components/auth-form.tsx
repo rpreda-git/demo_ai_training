@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { KanbanSquare, Loader2 } from "lucide-react";
-import { signIn, signUp } from "@/lib/auth-client";
+import { authClient, signIn, signUp } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [twoFactor, setTwoFactor] = useState(false);
+  const [code, setCode] = useState("");
 
   const isLogin = mode === "login";
 
@@ -38,6 +40,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         toast.error(result.error.message ?? "Authentication failed");
         return;
       }
+      if (isLogin && (result.data as { twoFactorRedirect?: boolean })?.twoFactorRedirect) {
+        setTwoFactor(true);
+        return;
+      }
       toast.success(isLogin ? "Welcome back!" : "Account created");
       await navigate({ to: "/boards" });
     } catch {
@@ -45,6 +51,52 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function verifyCode(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await authClient.twoFactor.verifyTotp({ code });
+    setLoading(false);
+    setCode("");
+    if (error) {
+      toast.error(error.message ?? "Invalid code");
+      return;
+    }
+    toast.success("Welcome back!");
+    await navigate({ to: "/boards" });
+  }
+
+  if (twoFactor) {
+    return (
+      <div className="bg-muted/30 flex min-h-svh flex-col items-center justify-center gap-6 p-6">
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <CardTitle>Two-factor authentication</CardTitle>
+            <CardDescription>Enter the 6-digit code from your authenticator app.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={verifyCode} id="totp-form" className="grid gap-2">
+              <Label htmlFor="totp-code">Code</Label>
+              <Input
+                id="totp-code"
+                inputMode="numeric"
+                autoFocus
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="123456"
+              />
+            </form>
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" form="totp-form" className="w-full" disabled={loading || code.length < 6}>
+              {loading && <Loader2 className="size-4 animate-spin" />}
+              Verify
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
   }
 
   function fillDemo() {

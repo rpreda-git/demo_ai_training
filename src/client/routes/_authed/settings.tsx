@@ -15,6 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { TwoFactorCard } from "@/components/two-factor-card";
 
 export const Route = createFileRoute("/_authed/settings")({
   component: SettingsPage,
@@ -185,6 +186,8 @@ function SettingsPage() {
             </CardFooter>
           </form>
         </Card>
+
+        <TwoFactorCard />
       </div>
     </div>
   );

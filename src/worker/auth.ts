@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { twoFactor } from "better-auth/plugins/two-factor";
 import { eq } from "drizzle-orm";
 import { getDb } from "./db";
 import * as schema from "./db/schema";
@@ -39,6 +40,7 @@ function buildAuth(env: Env) {
         session: schema.session,
         account: schema.account,
         verification: schema.verification,
+        twoFactor: schema.twoFactor,
       },
     }),
     emailAndPassword: {
@@ -52,6 +54,7 @@ function buildAuth(env: Env) {
     },
     // Accept the deployed origin without hardcoding the domain.
     trustedOrigins: (request) => (request ? [new URL(request.url).origin] : []),
+    plugins: [twoFactor({ issuer: "Kanban" })],
   });
 }
 

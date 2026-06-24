@@ -37,6 +37,7 @@ export const user = sqliteTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
   image: text("image"),
+  twoFactorEnabled: integer("two_factor_enabled", { mode: "boolean" }).default(false),
   // The organization whose boards the user is currently viewing.
   activeOrganizationId: text("active_organization_id").references(
     (): AnySQLiteColumn => organization.id,
@@ -44,6 +45,17 @@ export const user = sqliteTable("user", {
   ),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
+});
+
+// Better Auth twoFactor plugin table.
+export const twoFactor = sqliteTable("two_factor", {
+  id: id(),
+  secret: text("secret").notNull(),
+  backupCodes: text("backup_codes").notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  verified: integer("verified", { mode: "boolean" }).default(true),
 });
 
 export const session = sqliteTable("session", {
