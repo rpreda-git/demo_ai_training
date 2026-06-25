@@ -164,7 +164,12 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           </form>
         </CardContent>
         <CardFooter className="flex-col gap-3">
-          <Button type="submit" form="auth-form" className="w-full" disabled={loading}>
+          <Button
+            type="submit"
+            form="auth-form"
+            className="w-full bg-purple-600 text-white hover:bg-purple-700"
+            disabled={loading}
+          >
             {loading && <Loader2 className="size-4 animate-spin" />}
             {isLogin ? "Sign in" : "Create account"}
           </Button>
