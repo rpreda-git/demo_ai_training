@@ -167,7 +167,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           <Button
             type="submit"
             form="auth-form"
-            className="w-full bg-purple-600 text-white hover:bg-purple-700"
+            className="w-full bg-pink-600 text-white hover:bg-pink-700"
             disabled={loading}
           >
             {loading && <Loader2 className="size-4 animate-spin" />}
